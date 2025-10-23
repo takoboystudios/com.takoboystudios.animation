@@ -1,0 +1,22 @@
+{
+  "name": "com.takoboystudios.animation",
+  "version": "1.0.0",
+  "displayName": "TakoBoy Studios - Animation",
+  "description": "A powerful and flexible sprite animation system for Unity with built-in editor tools, pooling integration, and a streamlined workflow. Features frame-by-frame animation, editor preview player, multiple loop modes, and smart sprite processing tools.",
+  "unity": "2020.3",
+  "keywords": [
+    "sprite",
+    "animation",
+    "2d",
+    "pixel-art",
+    "frame-by-frame",
+    "editor-tools"
+  ],
+  "author": {
+    "name": "TakoBoy Studios"
+  },
+  "dependencies": {
+    "com.takoboystudios.core": "1.0.0"
+  },
+  "type": "library"
+}

@@ -1,0 +1,161 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.U2D.Sprites;
+using UnityEngine;
+
+namespace TakoBoyStudios.Animation.Editor
+{
+    /// <summary>
+    /// Editor utility for processing sprite textures with proper import settings and slicing.
+    /// </summary>
+    public static class SpriteProcessor
+    {
+        private const string PPU_PREF_KEY = "TakoBoy_SpritePPU";
+        private const int DEFAULT_PPU = 32;
+
+        public static int PixelsPerUnit => EditorPrefs.GetInt(PPU_PREF_KEY, DEFAULT_PPU);
+
+        [MenuItem("Assets/TakoBoy Studios/Sprites/Process Sprite", false, 100)]
+        public static void ProcessSprite()
+        {
+            ProcessSprites(Selection.assetGUIDs, skipIfAlreadyProcessed: false);
+        }
+
+        [MenuItem("Assets/TakoBoy Studios/Sprites/Process Sprite (Skip if Processed)", false, 101)]
+        public static void ProcessSpriteSkipProcessed()
+        {
+            ProcessSprites(Selection.assetGUIDs, skipIfAlreadyProcessed: true);
+        }
+
+        [MenuItem("Assets/TakoBoy Studios/Sprites/Slice Sprite Sheet", false, 150)]
+        public static void SliceSprite()
+        {
+            ProcessSprites(Selection.assetGUIDs, skipIfAlreadyProcessed: false);
+            SliceSprites(Selection.assetGUIDs);
+        }
+
+        [MenuItem("Assets/TakoBoy Studios/Sprites/Configure PPU", false, 200)]
+        public static void ConfigurePPU()
+        {
+            int currentPPU = PixelsPerUnit;
+            string input = EditorInputDialog.Show("Configure Pixels Per Unit", $"Current: {currentPPU}", currentPPU.ToString());
+            if (!string.IsNullOrEmpty(input) && int.TryParse(input, out int newPPU) && newPPU > 0)
+            {
+                EditorPrefs.SetInt(PPU_PREF_KEY, newPPU);
+                Debug.Log($"[SpriteProcessor] PPU set to: {newPPU}");
+            }
+        }
+
+        private static void ProcessSprites(string[] guids, bool skipIfAlreadyProcessed)
+        {
+            if (guids == null || guids.Length == 0) return;
+
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (texture == null) continue;
+
+                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null) continue;
+
+                if (skipIfAlreadyProcessed && Math.Abs(importer.spritePixelsPerUnit - PixelsPerUnit) < float.Epsilon)
+                    continue;
+
+                importer.spritePixelsPerUnit = PixelsPerUnit;
+                importer.textureType = TextureImporterType.Sprite;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.filterMode = FilterMode.Point;
+                importer.isReadable = true;
+                importer.mipmapEnabled = false;
+
+                TextureImporterSettings settings = new TextureImporterSettings();
+                importer.ReadTextureSettings(settings);
+                settings.spriteMeshType = SpriteMeshType.FullRect;
+                settings.spriteExtrude = 0;
+                settings.spriteGenerateFallbackPhysicsShape = false;
+                settings.spritePivot = new Vector2(0.5f, 0f);
+                importer.SetTextureSettings(settings);
+
+                importer.isReadable = false;
+                importer.SaveAndReimport();
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            }
+            AssetDatabase.Refresh();
+        }
+
+        private static void SliceSprites(string[] guids)
+        {
+            if (guids == null || guids.Length == 0) return;
+
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (texture == null || !texture.name.Contains("_")) continue;
+
+                string[] split = texture.name.Split('_');
+                if (split.Length < 2 || !split[split.Length - 1].Contains("x")) continue;
+
+                string sizeStr = split[split.Length - 1];
+                string[] sizeParts = sizeStr.Split('x');
+                if (sizeParts.Length != 2 || !int.TryParse(sizeParts[0], out int width) || !int.TryParse(sizeParts[1], out int height))
+                    continue;
+
+                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null) continue;
+
+                importer.isReadable = true;
+                importer.spriteImportMode = SpriteImportMode.Multiple;
+                importer.SaveAndReimport();
+
+                texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                int rows = texture.height / height;
+                int columns = texture.width / width;
+                List<SpriteRect> rects = new List<SpriteRect>();
+                int frame = 0;
+
+                for (int r = rows - 1; r >= 0; r--)
+                {
+                    for (int c = 0; c < columns; c++)
+                    {
+                        Color[] colors = texture.GetPixels(c * width, r * height, width, height);
+                        if (colors.All(m => Mathf.Approximately(m.a, 0))) continue;
+
+                        rects.Add(new SpriteRect
+                        {
+                            rect = new Rect(c * width, r * height, width, height),
+                            name = $"{texture.name}_{frame}",
+                            alignment = SpriteAlignment.BottomCenter,
+                            pivot = new Vector2(0.5f, 0f),
+                            spriteID = GUID.Generate()
+                        });
+                        frame++;
+                    }
+                }
+
+                var factory = new SpriteDataProviderFactories();
+                factory.Init();
+                var dataProvider = factory.GetSpriteEditorDataProviderFromObject(importer);
+                dataProvider.InitSpriteEditorDataProvider();
+                dataProvider.SetSpriteRects(rects.ToArray());
+                dataProvider.Apply();
+
+                importer.isReadable = false;
+                importer.SaveAndReimport();
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            }
+            AssetDatabase.Refresh();
+        }
+    }
+
+    public static class EditorInputDialog
+    {
+        public static string Show(string title, string message, string defaultValue = "")
+        {
+            return defaultValue;
+        }
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "name": "TakoBoyStudios.Animation.Editor",
+    "rootNamespace": "TakoBoyStudios.Animation.Editor",
+    "references": [
+        "TakoBoyStudios.Animation.Runtime",
+        "TakoBoyStudios.Core.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.sirenix.odininspector",
+            "expression": "",
+            "define": "ODIN_INSPECTOR"
+        }
+    ],
+    "noEngineReferences": false
+}
