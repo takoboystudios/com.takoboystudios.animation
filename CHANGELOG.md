@@ -8,12 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2025-10-23
 
 ### Added
-- GIF to sprite sheet converter tool (GifToSpriteSheet.cs)
+- GIF to sprite sheet converter - standalone Processing application
 - Automatically extracts frames from animated GIFs
 - Preserves frame timing data in JSON format
 - Creates optimized sprite sheets compatible with animation workflow
-- Menu command: Assets → TakoBoy Studios → Animation → Convert GIF to Sprite Sheet
 - Supports naming convention: AssetName@AnimationName.gif
+- Includes pre-built executables:
+  - `GifToSpriteSheet/windows-amd64.zip` - Windows x64 version
+  - `GifToSpriteSheet/macos-aarch64.zip` - macOS Apple Silicon version
+
+### Changed
+- Replaced Unity editor GIF converter with standalone Processing app for better compatibility
 
 ## [1.0.0] - 2025-10-23
 

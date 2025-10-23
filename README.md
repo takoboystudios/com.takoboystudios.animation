@@ -66,13 +66,19 @@ The package automatically sets up the `ODIN_INSPECTOR` define if Odin Inspector 
 
 Name your sprite sheet using the convention:
 ```
-AssetName@AnimationName_WIDTHxHEIGHT.png
+asset-name@animation-name_WIDTHxHEIGHT.png
 ```
 
+**Naming rules:**
+- All lowercase
+- Words separated by hyphens (-)
+- Only exception is the underscore before dimensions
+
 **Examples:**
-- `Player@idle_loop_32x32.png` → Creates "Player" asset with "idle_loop" animation
-- `Enemy@attack_64x64.png` → Creates "Enemy" asset with "attack" animation
-- `Coin@spin_loop_16x16.png` → Creates "Coin" asset with "spin_loop" animation
+- `player@idle-loop_32x32.png` → Creates "player" asset with "idle-loop" animation
+- `enemy@attack_64x64.png` → Creates "enemy" asset with "attack" animation
+- `coin@spin-loop_16x16.png` → Creates "coin" asset with "spin-loop" animation
+- `fire-ball@explode_32x32.png` → Creates "fire-ball" asset with "explode" animation
 
 #### Step 2: Process the Sprite
 
@@ -298,6 +304,44 @@ Automatically slices sprite sheets:
 - `Character_32x32.png` → Slices into 32x32 frames
 - `Enemy_64x64.png` → Slices into 64x64 frames
 
+#### GIF to Sprite Sheet Converter
+
+A standalone Processing application to convert animated GIFs to sprite sheets.
+
+**Location:** `GifToSpriteSheet/` folder
+
+**Available versions:**
+- `windows-amd64.zip` - Windows x64
+- `macos-aarch64.zip` - macOS Apple Silicon
+
+**How to use:**
+1. Extract the appropriate ZIP file for your platform
+2. Run the application (double-click the executable/app)
+3. Drop your GIF file(s) into the application window
+4. Output files are created in the same folder as the input GIF
+
+**Input naming convention:**
+```
+asset-name@animation-name.gif
+```
+
+**Naming rules:**
+- All lowercase
+- Words separated by hyphens (-)
+- No dimensions in the GIF filename
+
+**Outputs:**
+- `asset-name@animation-name_WxH.png` - Sprite sheet with all frames
+- `asset-name@animation-name.json` - Frame timing data in milliseconds
+
+**Examples:**
+- Input: `player@run-loop.gif`
+- Outputs: `player@run-loop_32x32.png` + `player@run-loop.json`
+- Input: `fire-ball@explode.gif`
+- Outputs: `fire-ball@explode_64x64.png` + `fire-ball@explode.json`
+
+The generated sprite sheet and JSON can be directly imported into Unity and used with the animation workflow.
+
 ### Animation Creation Workflow
 
 #### Automatic Creation
@@ -305,14 +349,20 @@ Automatically slices sprite sheets:
 
 Creates animations from sprites using naming convention:
 
-**Format:** `AssetName@AnimationName_WxH.png`
+**Format:** `asset-name@animation-name_WxH.png`
+
+**Naming rules:**
+- All lowercase
+- Words separated by hyphens (-)
+- Only exception is the underscore before dimensions
 
 **Examples:**
 ```
-Player@idle_loop_32x32.png
-Player@walk_loop_32x32.png
-Player@attack_32x32.png
-Enemy@idle_64x64.png
+player@idle-loop_32x32.png
+player@walk-loop_32x32.png
+player@attack_32x32.png
+enemy@idle_64x64.png
+fire-ball@explode_64x64.png
 ```
 
 **Features:**
@@ -326,8 +376,8 @@ Enemy@idle_64x64.png
 
 For custom frame timing, create a JSON file with the same base name:
 
-**Sprite:** `Player@attack_32x32.png`
-**JSON:** `Player@attack.json`
+**Sprite:** `player@attack_32x32.png`
+**JSON:** `player@attack.json`
 
 ```json
 {
@@ -535,26 +585,51 @@ The package automatically detects Odin Inspector through version defines in the 
 ### Sprite Sheet Naming
 
 ```
-AssetName@AnimationName_WIDTHxHEIGHT.png
+asset-name@animation-name_WIDTHxHEIGHT.png
 ```
 
+**Naming Rules:**
+- **All lowercase** - No capital letters allowed
+- **Hyphens for word separation** - Use `-` to separate words in both asset and animation names
+- **Underscore before dimensions** - Only `_` allowed is right before `WIDTHxHEIGHT`
+
 **Parts:**
-- `AssetName`: Name of the SpriteAnimationAsset (e.g., "Player", "Enemy")
-- `@`: Required separator
-- `AnimationName`: Name of the animation (e.g., "idle", "walk_loop")
-- `_`: Required separator
+- `asset-name`: Name of the SpriteAnimationAsset (e.g., "player", "fire-ball", "coin")
+- `@`: Required separator between asset and animation
+- `animation-name`: Name of the animation (e.g., "idle-loop", "walk", "attack")
+- `_`: Required separator before dimensions
 - `WIDTHxHEIGHT`: Frame dimensions for slicing (e.g., "32x32", "64x64")
+
+**Examples:**
+- `player@idle-loop_32x32.png`
+- `fire-ball@explode_64x64.png`
+- `enemy-boss@attack-heavy_128x128.png`
 
 **Auto-Loop Detection:**
 If animation name contains "loop", it automatically uses `LOOPTOSTART` mode.
 
+### GIF Naming (for GIF to Sprite Sheet Converter)
+
+```
+asset-name@animation-name.gif
+```
+
+**Same rules as sprite sheets, but without dimensions:**
+- All lowercase
+- Hyphens for word separation
+- No `_WIDTHxHEIGHT` suffix
+
+**Examples:**
+- `player@run-loop.gif` → Outputs `player@run-loop_32x32.png` + `player@run-loop.json`
+- `fire-ball@explode.gif` → Outputs `fire-ball@explode_64x64.png` + `fire-ball@explode.json`
+
 ### JSON Timing Files
 
 ```
-AssetName@AnimationName.json
+asset-name@animation-name.json
 ```
 
-Must match the sprite name (without dimensions).
+Must match the sprite/GIF name (without dimensions).
 
 **Format:**
 ```json
