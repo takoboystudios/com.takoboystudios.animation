@@ -2,7 +2,6 @@
     "name": "TakoBoyStudios.Animation.Runtime",
     "rootNamespace": "TakoBoyStudios.Animation",
     "references": [
-        "TakoBoyStudios.Core.Runtime",
         "TakoBoyStudios.Core"
     ],
     "includePlatforms": [],
