@@ -16,7 +16,6 @@
     "name": "TakoBoy Studios"
   },
   "dependencies": {
-    "com.takoboystudios.core": "1.0.0"
   },
   "type": "library"
 }

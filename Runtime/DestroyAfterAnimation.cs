@@ -31,6 +31,10 @@ namespace TakoBoyStudios.Animation
         [Tooltip("Name of the animation to play")]
         public string m_animation;
 
+        public enum DestroyBehaviour { Destroy, Disable }
+
+        public DestroyBehaviour destroyBehaviour;
+
         #endregion
 
         #region Private Fields
@@ -122,20 +126,10 @@ namespace TakoBoyStudios.Animation
             // Invoke event before cleanup
             OnAnimationComplete?.Invoke(gameObject);
 
-            // Check if object came from a pool
-            bool isFromPool = false;
-
-            if (PoolManager.Instance != null)
-            {
-                // Try to return to pool
-                isFromPool = PoolManager.Instance.TryRelease(gameObject);
-            }
-
-            // If not from pool, destroy normally
-            if (!isFromPool)
-            {
+            if(destroyBehaviour == DestroyBehaviour.Disable)
+                gameObject.SetActive(false);
+            else if (destroyBehaviour == DestroyBehaviour.Destroy)
                 Destroy(gameObject);
-            }
         }
 
         #endregion

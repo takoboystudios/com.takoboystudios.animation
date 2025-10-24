@@ -3,7 +3,9 @@
     "rootNamespace": "TakoBoyStudios.Animation.Editor",
     "references": [
         "TakoBoyStudios.Animation.Runtime",
-        "TakoBoyStudios.Core.Runtime"
+        "TakoBoyStudios.Core.Runtime",
+        "TakoBoyStudios.Core",
+        "Unity.2D.Sprite.Editor"
     ],
     "includePlatforms": [
         "Editor"

@@ -43,7 +43,7 @@ namespace TakoBoyStudios.Animation.Editor
             return null;
         }
 
-        protected static object[] DragResult<T>()
+        public static object[] DragResult<T>()
         {
             EventType eventType = Event.current.type;
             foreach (object o in DragAndDrop.objectReferences)

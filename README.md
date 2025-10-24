@@ -29,8 +29,8 @@ Add this line to your `manifest.json` in the `Packages` folder:
 ```json
 {
   "dependencies": {
-    "com.takoboystudios.animation": "https://github.com/yourusername/com.takoboystudios.animation.git",
-    "com.takoboystudios.core": "https://github.com/yourusername/com.takoboystudios.core.git"
+    "com.takoboystudios.animation": "https://github.com/takoboystudios/com.takoboystudios.animation.git",
+    "com.takoboystudios.core": "https://github.com/takoboystudios/com.takoboystudios.core.git"
   }
 }
 ```

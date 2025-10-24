@@ -1,610 +1,649 @@
 ﻿using UnityEngine;
 using UnityEditor;
-using System.Collections;
-using Framework;
+using System.Collections.Generic;
 using System.Linq;
+using Sirenix.OdinInspector.Editor;
+using Sirenix.Utilities.Editor;
 
-
-public class CustomDragData
+namespace TakoBoyStudios.Animation.Editor
 {
-    public int originalIndex = -1;
-    public int animationIdx = -1;
-}
-
-[CustomEditor(typeof(SpriteAnimationAsset))]
-public class SpriteAnimationAssetInspector : Editor
-{
-    protected static Event currentEvent;
-    protected static Vector2 mousePosition;
-    protected bool isDragginKeyframe = false;
-
-    protected const int FRAMEQUAD_WIDTH = 25;
-    protected const int FRAMEQUAD_HEIGHT = 25;
-    protected const int FRAMEQUAD_WIDTH_SEPARATION = 5;
-    protected const int FRAMEQUAD_HEIGHT_SEPARATION = 5;
-    private const int AnimationsPerPage = 3;
-    protected float usableWidth;
-    protected SerializedProperty spEditorConfirmations;
-
-    //private int pages;
-    private int currentPage;
-
-    [MenuItem("GameObject/2D Object/Animated Sprite")]
-    public static void CreateSpriteGameObject()
+    class CustomDragData
     {
-        GameObject n = new GameObject();
-        n.AddComponent<SpriteRenderer>();
-        n.AddComponent<SpriteAnimation>();
-        n.name = "New Animated Sprite";
+        public int originalIndex = -1;
+        public int animationIdx = -1;
     }
 
-    public void OnEnable()
+    [CustomEditor(typeof(SpriteAnimationAsset))]
+    public class SpriteAnimationAssetEditor : UnityEditor.Editor
     {
-        var animAsset = target as SpriteAnimationAsset;
-        animAsset.sortAnimationsAlphabetically();
-    }
+        const int FRAME_THUMB_SIZE = 40;
+        const int FRAME_SPACING = 8;
+        const int ANIMATIONS_PER_PAGE = 3;
+        const string DRAG_DATA_KEY = "dragKeyframe";
+        const float PREVIEW_SIZE = 80f;
 
-    protected static string DRAG_DATA_KEY = "testkey";
+        static Event currentEvent;
+        static Vector2 mousePosition;
+        bool isDraggingKeyframe = false;
+        int currentPage;
+        float _setFrameTimeValue = 0.04f;
 
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
-        spEditorConfirmations = serializedObject.FindProperty("editorConfirmations");
+        Dictionary<int, AnimationPreviewState> previewStates = new Dictionary<int, AnimationPreviewState>();
+        Dictionary<int, bool> foldoutStates = new Dictionary<int, bool>();
 
-        currentEvent = Event.current;
-
-        if (currentEvent.isMouse)
+        class AnimationPreviewState
         {
-            mousePosition = currentEvent.mousePosition;
+            public bool isPlaying = false;
+            public int currentFrame = 0;
+            public double lastUpdateTime = 0;
+            public double elapsedTime = 0;
         }
 
-        usableWidth = Screen.width - 50;
-        Rect buttonPosition = GUILayoutUtility.GetRect(usableWidth, 20);
-        //GUI.Box(buttonPosition, string.Empty);
-        buttonPosition.width = 30;
-        SerializedProperty animationList = serializedObject.FindProperty("animations");
+        [MenuItem("GameObject/TakoBoy Studios/Animated Sprite", false, 10)]
+        public static void CreateAnimatedSpriteGameObject()
+        {
+            GameObject newObj = new GameObject("Animated Sprite");
+            newObj.AddComponent<SpriteRenderer>();
+            newObj.AddComponent<SpriteAnimation>();
+            Selection.activeGameObject = newObj;
 
-        if (GUI.Button(buttonPosition, "+"))
+            if (SceneView.lastActiveSceneView != null)
+            {
+                SceneView.lastActiveSceneView.FrameSelected();
+            }
+        }
+
+        void OnEnable()
+        {
+            SpriteAnimationAsset animAsset = target as SpriteAnimationAsset;
+            if (animAsset != null)
+            {
+                animAsset.SortAnimationsAlphabetically();
+            }
+
+            //EditorApplication.update += OnEditorUpdate;
+        }
+
+        void OnDisable()
+        {
+            //EditorApplication.update -= OnEditorUpdate;
+        }
+
+        // void OnEditorUpdate()
+        // {
+        //     if (target == null)
+        //         return;
+        //
+        //     bool needsRepaint = false;
+        //     double currentTime = EditorApplication.timeSinceStartup;
+        //
+        //     // Update all playing animations
+        //     foreach (KeyValuePair<int, AnimationPreviewState> kvp in previewStates.ToList())
+        //     {
+        //         AnimationPreviewState previewState = kvp.Value;
+        //         if (!previewState.isPlaying)
+        //             continue;
+        //
+        //         int animIdx = kvp.Key;
+        //         SpriteAnimationAsset animAsset = target as SpriteAnimationAsset;
+        //         if (animAsset == null || animIdx >= animAsset.animations.Count)
+        //             continue;
+        //
+        //         SpriteAnimationData animData = animAsset.animations[animIdx];
+        //         if (animData.frameDatas == null || animData.frameDatas.Count == 0)
+        //             continue;
+        //
+        //         // Calculate delta time
+        //         double deltaTime = currentTime - previewState.lastUpdateTime;
+        //         previewState.lastUpdateTime = currentTime;
+        //
+        //         // Clamp delta to avoid huge jumps
+        //         deltaTime = System.Math.Min(deltaTime, 0.1);
+        //
+        //         previewState.elapsedTime += deltaTime;
+        //
+        //         // Get current frame timing
+        //         float frameTime = animData.frameDatas[previewState.currentFrame].time / 1000f; // ms to seconds
+        //         float speedRatio = animData.speedRatio;
+        //
+        //         if (speedRatio <= 0) speedRatio = 1f;
+        //         if (frameTime <= 0) frameTime = 0.1f;
+        //
+        //         float adjustedFrameTime = frameTime / speedRatio;
+        //
+        //         // Advance frames with safety counter
+        //         int safetyCounter = 0;
+        //         while (previewState.elapsedTime >= adjustedFrameTime && safetyCounter < 100)
+        //         {
+        //             previewState.elapsedTime -= adjustedFrameTime;
+        //             previewState.currentFrame = (previewState.currentFrame + 1) % animData.frameDatas.Count;
+        //             safetyCounter++;
+        //
+        //             // Update timing for next frame
+        //             frameTime = animData.frameDatas[previewState.currentFrame].time / 1000f;
+        //             if (frameTime <= 0) frameTime = 0.1f;
+        //             adjustedFrameTime = frameTime / speedRatio;
+        //         }
+        //
+        //         needsRepaint = true;
+        //     }
+        //
+        //     if (needsRepaint)
+        //     {
+        //         Repaint();
+        //     }
+        // }
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+
+            currentEvent = Event.current;
+            if (currentEvent.isMouse)
+            {
+                mousePosition = currentEvent.mousePosition;
+            }
+            
+            SirenixEditorGUI.BeginBox("Sprite Animation Asset");
+
+            DrawToolbar();
+            SirenixEditorGUI.IndentSpace();
+            DrawAnimationList();
+            HandleDragAndDrop();
+
+            SirenixEditorGUI.EndBox();
+
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        void DrawToolbar()
+        {
+            SerializedProperty animationList = serializedObject.FindProperty("animations");
+
+            SirenixEditorGUI.BeginHorizontalToolbar();
+
+            if (GUILayout.Button("+ Add Animation", GUILayout.Width(120)))
+            {
+                AddNewAnimation(animationList);
+                return;
+            }
+
+            GUILayout.FlexibleSpace();
+
+            int totalAnims = animationList.arraySize;
+            int pages = Mathf.CeilToInt((float)totalAnims / ANIMATIONS_PER_PAGE);
+            if (currentPage >= pages) currentPage = Mathf.Max(0, pages - 1);
+
+            GUI.enabled = currentPage > 0;
+            if (GUILayout.Button("◄", GUILayout.Width(30))) currentPage--;
+            GUI.enabled = true;
+
+            GUILayout.Label($"Page {currentPage + 1} / {Mathf.Max(1, pages)}", GUILayout.Width(80));
+
+            GUI.enabled = currentPage < pages - 1 && pages > 1;
+            if (GUILayout.Button("►", GUILayout.Width(30))) currentPage++;
+            GUI.enabled = true;
+
+#if ODIN_INSPECTOR
+            SirenixEditorGUI.EndHorizontalToolbar();
+#else
+            EditorGUILayout.EndHorizontal();
+#endif
+        }
+
+        void AddNewAnimation(SerializedProperty animationList)
         {
             int idx = animationList.arraySize;
             animationList.InsertArrayElementAtIndex(idx);
+
             SerializedProperty newItem = animationList.GetArrayElementAtIndex(idx);
-            newItem.FindPropertyRelative("newFramesTime").floatValue = 0.08f;
-            newItem.FindPropertyRelative("speedRatio").floatValue = 1;
             newItem.FindPropertyRelative("name").stringValue = "new animation";
+            newItem.FindPropertyRelative("speedRatio").floatValue = 1f;
             newItem.FindPropertyRelative("loop").enumValueIndex = 0;
             newItem.FindPropertyRelative("frameToLoop").intValue = 0;
             newItem.FindPropertyRelative("frameDatas").arraySize = 0;
             newItem.FindPropertyRelative("selectedIndex").intValue = -1;
+
             serializedObject.ApplyModifiedProperties();
-            return;
         }
 
-        // buttonPosition.xMin = usableWidth - 80;
-        // buttonPosition.width = 95;
-        // spEditorConfirmations.boolValue = EditorGUI.ToggleLeft(buttonPosition, new GUIContent("Confirmations"), spEditorConfirmations.boolValue);
-
-        var pages = animationList.arraySize / AnimationsPerPage + (animationList.arraySize % AnimationsPerPage == 0 ? 0 : 1);
-
-        if (currentPage >= pages) currentPage = pages - 1;
-
-        buttonPosition.x += 30;
-
-        if (GUI.Button(buttonPosition, "◄"))
+        void DrawAnimationList()
         {
-            if (currentPage > 0) currentPage--;
-        }
+            SerializedProperty animationList = serializedObject.FindProperty("animations");
 
-        buttonPosition.x += 30;
+            int startIndex = ANIMATIONS_PER_PAGE * currentPage;
+            int endIndex = Mathf.Min(startIndex + ANIMATIONS_PER_PAGE, animationList.arraySize);
 
-        if (GUI.Button(buttonPosition, "►"))
-        {
-            if (currentPage < pages - 1) currentPage++;
-        }
-
-        var startIndex = AnimationsPerPage * currentPage;
-        var endIndex = startIndex + AnimationsPerPage;
-
-        if (animationList.arraySize < endIndex) endIndex = animationList.arraySize;
-
-        float currentHeight = 20;
-        float lastMinY = 75;
-        for (int i = startIndex; i < endIndex; i++)
-        {
-            SerializedProperty item = animationList.GetArrayElementAtIndex(i);
-
-            SerializedProperty spframeDatas = item.FindPropertyRelative("frameDatas");
-
-            float aditional = 0;
-
-            if (spframeDatas != null && spframeDatas.arraySize > 0)
+            for (int i = startIndex; i < endIndex; i++)
             {
-                aditional = ((spframeDatas.arraySize) * (FRAMEQUAD_WIDTH + FRAMEQUAD_WIDTH_SEPARATION));
-                aditional = (Mathf.Ceil(aditional / usableWidth)) * (FRAMEQUAD_HEIGHT + FRAMEQUAD_HEIGHT_SEPARATION);
-                aditional += 160;
-            }
-            currentHeight = 175 + aditional;
-
-            Rect totalSize = GUILayoutUtility.GetRect(usableWidth, currentHeight);
-            totalSize.yMin = lastMinY;
-            totalSize.height = currentHeight;
-            DrawListItem(i, totalSize, item, (target as SpriteAnimationAsset).animations[i], new GUIContent(string.Empty));
-            lastMinY = totalSize.yMax;
-            Rect supressButton = new Rect(totalSize.xMax - 40, totalSize.yMin + 5, 40, 18);
-            if (GUI.Button(supressButton, "X"))
-            {
-                animationList.DeleteArrayElementAtIndex(i);
-                serializedObject.ApplyModifiedProperties();
-                return;
+                SerializedProperty animProp = animationList.GetArrayElementAtIndex(i);
+                SpriteAnimationData animData = (target as SpriteAnimationAsset).animations[i];
+                DrawAnimation(i, animProp, animData);
             }
         }
 
-        switch (currentEvent.type)
+        void DrawProp(SerializedProperty prop, string propName, string propId)
         {
-            case EventType.MouseDrag:
-                CustomDragData existingDragData = DragAndDrop.GetGenericData("dragKeyframe") as CustomDragData;
-                if (existingDragData != null)
-                {
-                    DragAndDrop.visualMode = DragAndDropVisualMode.Link;
-                    isDragginKeyframe = true;
-                    DragAndDrop.StartDrag("Dragging List ELement");
-                    currentEvent.Use();
-                }
-                break;
-            case EventType.MouseUp:
-                if (isDragginKeyframe)
-                {
-                    DragAndDrop.paths = null;
-                    DragAndDrop.objectReferences = new UnityEngine.Object[0];
-                    DragAndDrop.PrepareStartDrag();// reset data
-                    isDragginKeyframe = false;
-                }
-                break;
-            case EventType.DragExited:
-                if (isDragginKeyframe)
-                {
-                    DragAndDrop.paths = null;
-                    DragAndDrop.objectReferences = new UnityEngine.Object[0];
-                    isDragginKeyframe = false;
-                    DragAndDrop.PrepareStartDrag();
-                    currentEvent.Use();
-                }
-                break;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(propName, GUILayout.Width(60));
+            EditorGUILayout.PropertyField(prop.FindPropertyRelative(propId), GUIContent.none);
+            GUILayout.EndHorizontal();
         }
 
-        if (GUI.changed)
-            serializedObject.ApplyModifiedProperties();
-    }
+        // Remove the Dictionary field and use these helper methods instead
 
-    public void DrawListItem(int animationIdx, Rect position, SerializedProperty property, SpriteAnimationData spriteAnimationData, GUIContent label)
-    {
-        int frameQuadRows = 1;
-        frameQuadRows = 1;
-        SerializedProperty spNewFramesTime = property.FindPropertyRelative("newFramesTime");
-        SerializedProperty spSetFramesTime = property.FindPropertyRelative("setFramesTime");
-        SerializedProperty spSpeedRatio = property.FindPropertyRelative("speedRatio");
-        SerializedProperty spName = property.FindPropertyRelative("name");
-        SerializedProperty spLoop = property.FindPropertyRelative("loop");
-        SerializedProperty spFrameToLoop = property.FindPropertyRelative("frameToLoop");
-        SerializedProperty spframeDatas = property.FindPropertyRelative("frameDatas");
-        SerializedProperty spSelectedIdx = property.FindPropertyRelative("selectedIndex");
-
-
-        Rect totalFrames = new Rect(position.xMin + 100, position.yMin + 100, 230, 40);
-
-        object[] dragItems = EditorExtensions.DropZone<Object>("Drag Sprites here", totalFrames);
-
-
-        // test sprites
-        if (!isDragginKeyframe && dragItems != null && dragItems.Length > 0)
+        string GetFoldoutKey(int animIdx)
         {
-            for (int i = 0; i < dragItems.Length; i++)
+            // Use the target's instance ID to make keys unique per asset
+            return $"SpriteAnimAsset_{target.GetInstanceID()}_Foldout_{animIdx}";
+        }
+
+        bool GetFoldoutState(int animIdx)
+        {
+            return SessionState.GetBool(GetFoldoutKey(animIdx), false); // default true (expanded)
+        }
+
+        void SetFoldoutState(int animIdx, bool state)
+        {
+            SessionState.SetBool(GetFoldoutKey(animIdx), state);
+        }
+
+        void DrawAnimation(int animIdx, SerializedProperty animProp, SpriteAnimationData animData)
+        {
+            SerializedProperty nameProp = animProp.FindPropertyRelative("name");
+    
+            // Get saved foldout state
+            bool isExpanded = GetFoldoutState(animIdx);
+    
+            // Draw the foldout group with styled header
+            SirenixEditorGUI.BeginBox();
+            isExpanded = SirenixEditorGUI.Foldout(isExpanded, $"Animation: {nameProp.stringValue}");
+    
+            // Save state if changed
+            SetFoldoutState(animIdx, isExpanded);
+    
+            // Only draw contents if expanded
+            if (isExpanded)
             {
-                Sprite l_sprite = dragItems[i] as Sprite;
+                SirenixEditorGUI.BeginBox($"Settings");
+        
+                DrawProp(animProp, "Name", "name");
+                DrawProp(animProp, "Loop Type", "loop");
+        
+                SerializedProperty loopProp = animProp.FindPropertyRelative("loop");
+                if (loopProp.enumValueIndex == (int)SpriteAnimationLoopMode.LOOPTOFRAME)
+                    DrawProp(animProp, "To Frame", "frameToLoop");
+        
+                SirenixEditorGUI.EndBox();
 
-                if (null == l_sprite)
+                // Layout
+                SerializedProperty framesProp = animProp.FindPropertyRelative("frameDatas");
+
+                DrawFrameTimeline(animIdx, animProp, framesProp);
+            }
+    
+            SirenixEditorGUI.EndBox();
+        }
+
+        void DrawAnimationPreview(int animIdx, SerializedProperty animProp, SerializedProperty framesProp, SpriteAnimationData animData)
+        {
+            if (!previewStates.ContainsKey(animIdx))
+            {
+                previewStates[animIdx] = new AnimationPreviewState();
+            }
+
+            AnimationPreviewState previewState = previewStates[animIdx];
+
+            SirenixEditorGUI.BeginBox("Preview");
+
+            // Controls
+            EditorGUILayout.BeginHorizontal();
+
+            string playButtonLabel = previewState.isPlaying ? "⏸ Pause" : "▶ Play";
+            if (GUILayout.Button(playButtonLabel, GUILayout.Height(30)))
+            {
+                previewState.isPlaying = !previewState.isPlaying;
+                if (previewState.isPlaying)
                 {
-                    Texture2D l_tex = dragItems[i] as Texture2D;
-
-                    if (null == l_tex)
-                        continue;
-
-                    string l_texPath = AssetDatabase.GetAssetPath(l_tex);
-                    Sprite[] l_sprites = AssetDatabase.LoadAllAssetsAtPath(l_texPath).OfType<Sprite>().ToArray();
-
-                    for (int j = 0; j < l_sprites.Length; j++)
-                    {
-                        Sprite o = l_sprites[j];
-
-                        if (spframeDatas.arraySize == 0)
-                        {
-                            spframeDatas.InsertArrayElementAtIndex(0);
-                            spSelectedIdx.intValue = 0;
-                        }
-                        else
-                        {
-                            spframeDatas.InsertArrayElementAtIndex(spSelectedIdx.intValue);
-                            spSelectedIdx.intValue++;
-                        }
-                        SerializedProperty newItem = spframeDatas.GetArrayElementAtIndex(spSelectedIdx.intValue);
-                        newItem.FindPropertyRelative("sprite").objectReferenceValue = o;
-                        newItem.FindPropertyRelative("time").floatValue = spNewFramesTime.floatValue;
-                    }
+                    // Initialize timing when starting
+                    previewState.lastUpdateTime = EditorApplication.timeSinceStartup;
+                    previewState.elapsedTime = 0;
                 }
-                else
+            }
+
+            if (GUILayout.Button("⏹ Stop", GUILayout.Height(30)))
+            {
+                previewState.isPlaying = false;
+                previewState.currentFrame = 0;
+                previewState.elapsedTime = 0;
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            // Preview sprite
+            if (framesProp.arraySize > 0)
+            {
+                int frameIndex = Mathf.Clamp(previewState.currentFrame, 0, framesProp.arraySize - 1);
+                SerializedProperty frameProp = framesProp.GetArrayElementAtIndex(frameIndex);
+                SerializedProperty spriteProp = frameProp.FindPropertyRelative("sprite");
+                Sprite sprite = spriteProp.objectReferenceValue as Sprite;
+
+                Rect previewRect = GUILayoutUtility.GetRect(PREVIEW_SIZE, PREVIEW_SIZE);
+
+                // Background
+                EditorGUI.DrawRect(previewRect, new Color(0.15f, 0.15f, 0.15f, 1f));
+
+                if (sprite != null)
                 {
-                    if (spframeDatas.arraySize == 0)
+                    Texture2D texture = sprite.texture;
+                    Rect spriteRect = sprite.rect;
+                    Rect texCoords = new Rect(
+                        spriteRect.x / texture.width,
+                        spriteRect.y / texture.height,
+                        spriteRect.width / texture.width,
+                        spriteRect.height / texture.height
+                    );
+
+                    // Fit with padding
+                    float padding = 10f;
+                    Rect paddedRect = new Rect(
+                        previewRect.x + padding,
+                        previewRect.y + padding,
+                        previewRect.width - padding * 2,
+                        previewRect.height - padding * 2
+                    );
+
+                    float spriteAspect = spriteRect.width / spriteRect.height;
+                    float previewAspect = paddedRect.width / paddedRect.height;
+
+                    Rect drawRect = paddedRect;
+                    if (spriteAspect > previewAspect)
                     {
-                        spframeDatas.InsertArrayElementAtIndex(0);
-                        spSelectedIdx.intValue = 0;
+                        float height = paddedRect.width / spriteAspect;
+                        drawRect.y += (paddedRect.height - height) / 2;
+                        drawRect.height = height;
                     }
                     else
                     {
-                        spframeDatas.InsertArrayElementAtIndex(spSelectedIdx.intValue);
-                        spSelectedIdx.intValue++;
+                        float width = paddedRect.height * spriteAspect;
+                        drawRect.x += (paddedRect.width - width) / 2;
+                        drawRect.width = width;
                     }
-                    SerializedProperty newItem = spframeDatas.GetArrayElementAtIndex(spSelectedIdx.intValue);
-                    newItem.FindPropertyRelative("sprite").objectReferenceValue = l_sprite;
-                    newItem.FindPropertyRelative("time").floatValue = spNewFramesTime.floatValue;
+
+                    GUI.DrawTextureWithTexCoords(drawRect, texture, texCoords);
+                }
+                else
+                {
+                    EditorGUI.LabelField(previewRect, "No Sprite", EditorStyles.centeredGreyMiniLabel);
                 }
 
+                EditorGUILayout.LabelField($"Frame {frameIndex + 1} / {framesProp.arraySize}", EditorStyles.centeredGreyMiniLabel);
             }
-            serializedObject.ApplyModifiedProperties();
-            return;
+
+            SirenixEditorGUI.EndBox();
         }
 
-
-        // 0
-        Rect newPos = new Rect(position.xMin, position.yMin, position.width, 20);
-        newPos.height = 1;
-        GUI.Box(newPos, new GUIContent(string.Empty));
-
-        // show content
-        newPos = new Rect(position.xMin, position.yMin + 5, 20, 20);
-        bool showContent = EditorPrefs.GetBool(string.Format("Animx_{0}_{1}", animationIdx, spName.stringValue), false);
-        showContent = EditorGUI.ToggleLeft(newPos, string.Empty, showContent);
-        EditorPrefs.SetBool(string.Format("Animx_{0}_{1}", animationIdx, spName.stringValue), showContent);
-
-        // 1
-        newPos = new Rect(position.xMin + 20, position.yMin + 5, position.width, 20);
-        EditorGUI.LabelField(newPos, "Name: ");
-        newPos.xMin = 90;
-        newPos.width = 150;
-        EditorGUI.PropertyField(newPos, spName, new GUIContent(string.Empty));
-
-
-        // play mode
-        //            newPos = new Rect (position.xMin + 240, position.yMin + 5, 40, 20);
-        //            bool playMode = EditorPrefs.GetBool ( string.Format ( "Animx_Play_{0}_{1}", animationIdx , spName.stringValue ) , false );
-        //
-        //            GUI.backgroundColor = playMode ? EditorColor.green : Color.white;
-        //
-        //            if ( GUI.Button ( newPos , "Play" ) )
-        //            {
-        //                playMode = !playMode;
-        //
-        //                EditorPrefs.SetBool ( string.Format ( "Animx_Play_{0}_{1}", animationIdx , spName.stringValue ) , playMode );
-        //
-        //                if ( playMode )
-        //                {
-        //                    var item = spframeDatas.GetArrayElementAtIndex (spSelectedIdx.intValue);
-        //
-        //                    var time = item.FindPropertyRelative ( "time" ).floatValue;
-        //
-        //                    var speed = spSpeedRatio.floatValue;
-        //
-        //                    EditorPrefs.SetFloat ( string.Format ( "Animx_ElapsedFrameTime_{0}_{1}", animationIdx , spName.stringValue ) , (float)(EditorApplication.timeSinceStartup + (time * speed)) );
-        //                }
-        //            }
-        //
-        //            GUI.backgroundColor = Color.white;
-
-
-        if (!showContent)
+        void DrawFrameTimeline(int animIdx, SerializedProperty animProp, SerializedProperty framesProp)
         {
-            int length = spframeDatas.arraySize;
+            SerializedProperty selectedIdxProp = animProp.FindPropertyRelative("selectedIndex");
+            int selectedIdx = selectedIdxProp.intValue;
 
-            newPos = new Rect(position.xMin, position.yMin + 30, position.width, 20);
-
-            if (length <= 0)
+            if (selectedIdx >= framesProp.arraySize)
             {
-                EditorGUI.HelpBox(newPos, "No Frames in animation!", MessageType.Error);
+                selectedIdx = framesProp.arraySize - 1;
+                selectedIdxProp.intValue = selectedIdx;
+            }
+
+            SirenixEditorGUI.BeginBox("Frames");
+
+            // Controls
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("+ Add Frame"))
+            {
+                framesProp.InsertArrayElementAtIndex(framesProp.arraySize);
+                SerializedProperty newFrame = framesProp.GetArrayElementAtIndex(framesProp.arraySize - 1);
+                newFrame.FindPropertyRelative("sprite").objectReferenceValue = null;
+                newFrame.FindPropertyRelative("time").floatValue = 0.04f;
+                selectedIdxProp.intValue = framesProp.arraySize - 1;
+            }
+
+            GUI.enabled = selectedIdx >= 0 && framesProp.arraySize > 0;
+            if (GUILayout.Button("- Remove", GUILayout.Width(80)))
+            {
+                framesProp.DeleteArrayElementAtIndex(selectedIdx);
+                selectedIdxProp.intValue = Mathf.Max(0, selectedIdx - 1);
+            }
+            GUI.enabled = true;
+
+            GUILayout.FlexibleSpace();
+            
+            _setFrameTimeValue = EditorGUILayout.FloatField(GUIContent.none, _setFrameTimeValue, GUILayout.Width(40));
+            if (GUILayout.Button("Set Frame Times", GUILayout.Width(140)))
+            {
+                for (int i = 0; i < framesProp.arraySize; i++)
+                    framesProp.GetArrayElementAtIndex(i).FindPropertyRelative("time").floatValue = _setFrameTimeValue;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (framesProp.arraySize == 0)
+            {
+                SirenixEditorGUI.InfoMessageBox("No frames. Add frames to start animating!");
+                SirenixEditorGUI.EndBox();
                 return;
             }
 
-            for (int i = 0; i < length; i++)
+            EditorGUILayout.Space(5);
+
+            DrawFrameGrid(animIdx, framesProp, selectedIdxProp);
+
+            EditorGUILayout.Space(10);
+
+            if (selectedIdx >= 0 && selectedIdx < framesProp.arraySize)
             {
-                var item = spframeDatas.GetArrayElementAtIndex(i);
+                DrawSelectedFrameDetails(framesProp.GetArrayElementAtIndex(selectedIdx));
+            }
+            
+            SirenixEditorGUI.EndBox();
+        }
 
-                var spriteProperty = item.FindPropertyRelative("sprite");
+        void DrawFrameGrid(int animIdx, SerializedProperty framesProp, SerializedProperty selectedIdxProp)
+        {
+            float availableWidth = EditorGUIUtility.currentViewWidth - 60;
+            float timelineWidth = Mathf.Min(availableWidth * 0.6f, 400f);
+            float gridWidth = timelineWidth - 40;
 
-                if (spriteProperty.objectReferenceValue == null)
+            int columns = Mathf.FloorToInt(gridWidth / (FRAME_THUMB_SIZE + FRAME_SPACING));
+            columns = Mathf.Max(1, columns);
+
+            int mouseOverIdx = -1;
+            Rect currentRect = GUILayoutUtility.GetRect(gridWidth,
+                Mathf.CeilToInt((float)framesProp.arraySize / columns) * (FRAME_THUMB_SIZE + FRAME_SPACING));
+
+            float xPos = currentRect.x;
+            float yPos = currentRect.y;
+
+            for (int i = 0; i < framesProp.arraySize; i++)
+            {
+                SerializedProperty frameProp = framesProp.GetArrayElementAtIndex(i);
+                bool isSelected = (i == selectedIdxProp.intValue);
+
+                Rect thumbRect = new Rect(xPos, yPos, FRAME_THUMB_SIZE, FRAME_THUMB_SIZE);
+
+                if (thumbRect.Contains(mousePosition))
                 {
-                    EditorGUI.HelpBox(newPos, "One or more frames does not have a reference value!", MessageType.Error);
-                    return;
+                    mouseOverIdx = i;
                 }
 
-            }
+                DrawFrameThumb(i, frameProp, thumbRect, isSelected, mouseOverIdx == i);
 
-            EditorGUI.HelpBox(newPos, "Looks Great!", MessageType.Info);
-            return;
-        }
-
-        // 2
-        newPos = new Rect(position.xMin, position.yMin + 30, position.width, 20);
-        EditorGUI.LabelField(newPos, "Loop Mode: ");
-        newPos.xMin = 90;
-        newPos.width = 120;
-        EditorGUI.PropertyField(newPos, spLoop, new GUIContent(string.Empty));
-        if (spriteAnimationData.loop == SpriteAnimationLoopMode.LOOPTOFRAME)
-        {
-            newPos.xMin = 220;
-            newPos.width = 90;
-            EditorGUI.LabelField(newPos, "To Frame: ");
-            newPos.xMin = 294;
-            newPos.width = 50;
-            EditorGUI.PropertyField(newPos, spFrameToLoop, new GUIContent(string.Empty));
-        }
-        // 3
-        newPos = new Rect(position.xMin, position.yMin + 53, position.width, 20);
-
-        newPos.width = 90;
-        EditorGUI.LabelField(newPos, new GUIContent("Speed Ratio:"));
-        newPos.xMin = newPos.xMax + 20;
-        newPos.width = 220;
-        EditorGUI.PropertyField(newPos, spSpeedRatio, new GUIContent(string.Empty));
-        //4
-        newPos = new Rect(position.xMax, position.yMin + 76, position.width, 20);
-        newPos.xMin = position.xMin;
-        newPos.width = 120;
-        EditorGUI.LabelField(newPos, new GUIContent("Set Frame Times: "));
-        newPos.xMin = newPos.xMax + 10;
-        newPos.width = 60;
-        EditorGUI.PropertyField(newPos, spSetFramesTime, new GUIContent(string.Empty));
-        newPos.xMin = newPos.xMax + 10;
-        newPos.width = 60;
-
-        if (GUI.Button(newPos, "Set"))
-        {
-            int l_count = spframeDatas.arraySize;
-
-            for (int i = 0; i < l_count; i++)
-            {
-                SerializedProperty item = spframeDatas.GetArrayElementAtIndex(i);
-                item.FindPropertyRelative("time").floatValue = spSetFramesTime.floatValue;
-            }
-        }
-        // 5
-        newPos = new Rect(position.xMin, position.yMin + 99, position.width, 20);
-        newPos.width = 40;
-        if (GUI.Button(newPos, "+"))
-        {
-            if (spframeDatas.arraySize == 0)
-            {
-                spSelectedIdx.intValue = 0;
-                spframeDatas.InsertArrayElementAtIndex(spSelectedIdx.intValue);
-            }
-            else
-            {
-                spframeDatas.InsertArrayElementAtIndex(spSelectedIdx.intValue);
-                spSelectedIdx.intValue++;
-            }
-            SerializedProperty citem = spframeDatas.GetArrayElementAtIndex(spSelectedIdx.intValue);
-            EditorGUIUtility.PingObject(citem.FindPropertyRelative("sprite").objectReferenceValue);
-            citem.FindPropertyRelative("sprite").objectReferenceValue = null;
-            citem.FindPropertyRelative("time").floatValue = spNewFramesTime.floatValue;
-            citem.FindPropertyRelative("eventEnabled").boolValue = false;
-            citem.FindPropertyRelative("eventName").stringValue = string.Empty;
-        }
-        newPos.xMin += 50;
-        newPos.width = 40;
-        if (GUI.Button(newPos, "-"))
-        {
-            spframeDatas.DeleteArrayElementAtIndex(spSelectedIdx.intValue);
-            if (spframeDatas.arraySize <= spSelectedIdx.intValue)
-            {
-                spSelectedIdx.intValue--;
-            }
-        }
-        newPos.xMin += 50;
-        newPos.width = 60;
-
-        float nextPos = newPos.yMax;
-
-        int max = spframeDatas.arraySize;
-        if (max > 0)
-        {
-            int idx = 0;
-            newPos.xMin = position.xMin;
-            newPos.yMin = position.yMin + 145;
-            newPos.width = FRAMEQUAD_WIDTH;
-            newPos.height = FRAMEQUAD_HEIGHT;
-
-            int mouseOverIDx = -1;
-
-            if (currentEvent.type == EventType.DragUpdated || currentEvent.isMouse)
-                mousePosition = currentEvent.mousePosition;
-
-            for (; idx < max; idx++)
-            {
-                SerializedProperty item = spframeDatas.GetArrayElementAtIndex(idx);
-
-                if (newPos.Contains(mousePosition))
-                    mouseOverIDx = idx;
-
-                DrawBox(idx, property, item, newPos, spSelectedIdx.intValue == idx);
-
-                newPos.xMin += FRAMEQUAD_WIDTH + FRAMEQUAD_WIDTH_SEPARATION;
-                newPos.width = FRAMEQUAD_WIDTH;
-                if (newPos.xMin + FRAMEQUAD_WIDTH + FRAMEQUAD_WIDTH_SEPARATION > position.xMin + position.width)
+                xPos += FRAME_THUMB_SIZE + FRAME_SPACING;
+                if ((i + 1) % columns == 0 && i < framesProp.arraySize - 1)
                 {
-                    newPos.xMin = position.xMin;
-                    newPos.yMin += FRAMEQUAD_HEIGHT + FRAMEQUAD_HEIGHT_SEPARATION;
-                    newPos.width = FRAMEQUAD_WIDTH;
-                    newPos.height = FRAMEQUAD_HEIGHT;
-                    frameQuadRows++;
+                    xPos = currentRect.x;
+                    yPos += FRAME_THUMB_SIZE + FRAME_SPACING;
                 }
             }
-            if (mouseOverIDx != -1)
+
+            if (mouseOverIdx != -1)
             {
-                Repaint();
+                HandleFrameInteraction(animIdx, framesProp, selectedIdxProp, mouseOverIdx);
+            }
+        }
 
-                switch (currentEvent.type)
-                {
+        void DrawFrameThumb(int frameIdx, SerializedProperty frameProp, Rect rect, bool isSelected, bool isHovered)
+        {
+            SerializedProperty spriteProp = frameProp.FindPropertyRelative("sprite");
+            Sprite sprite = spriteProp.objectReferenceValue as Sprite;
 
-                    case EventType.MouseDown:
-                        DragAndDrop.PrepareStartDrag();// reset data
-                        DragAndDrop.paths = null;
-                        DragAndDrop.objectReferences = new UnityEngine.Object[0];
-                        CustomDragData dragData = new CustomDragData();
-                        dragData.originalIndex = mouseOverIDx;
-                        dragData.animationIdx = animationIdx;
-                        DragAndDrop.SetGenericData("dragKeyframe", dragData);
-                        property.FindPropertyRelative("selectedIndex").intValue = mouseOverIDx;
+            Color borderColor = isSelected ? new Color(0.3f, 0.7f, 1f) : (isHovered ? Color.yellow : Color.gray);
+            EditorGUI.DrawRect(rect, borderColor);
+
+            Rect innerRect = new Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4);
+            EditorGUI.DrawRect(innerRect, new Color(0.2f, 0.2f, 0.2f));
+
+            if (sprite != null)
+            {
+                Texture2D texture = sprite.texture;
+                Rect spriteRect = sprite.rect;
+                Rect texCoords = new Rect(
+                    spriteRect.x / texture.width,
+                    spriteRect.y / texture.height,
+                    spriteRect.width / texture.width,
+                    spriteRect.height / texture.height
+                );
+
+                Rect previewRect = new Rect(innerRect.x + 2, innerRect.y + 2, innerRect.width - 4, innerRect.height - 4);
+                GUI.DrawTextureWithTexCoords(previewRect, texture, texCoords);
+            }
+
+            GUIStyle labelStyle = new GUIStyle(EditorStyles.miniLabel);
+            labelStyle.normal.textColor = Color.white;
+            labelStyle.alignment = TextAnchor.UpperLeft;
+            labelStyle.padding = new RectOffset(2, 2, 2, 2);
+            GUI.Label(rect, frameIdx.ToString(), labelStyle);
+        }
+
+        void DrawSelectedFrameDetails(SerializedProperty frameProp)
+        {
+            SirenixEditorGUI.BeginBox("Selected Frame");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Sprite", GUILayout.Width(60));
+            EditorGUILayout.PropertyField(frameProp.FindPropertyRelative("sprite"), GUIContent.none);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Time (ms)", GUILayout.Width(60));
+            EditorGUILayout.PropertyField(frameProp.FindPropertyRelative("time"), GUIContent.none);
+            GUILayout.EndHorizontal();
+
+            SirenixEditorGUI.EndBox();
+        }
+
+        void HandleFrameInteraction(int animIdx, SerializedProperty framesProp, SerializedProperty selectedIdxProp, int mouseOverIdx)
+        {
+            switch (currentEvent.type)
+            {
+                case EventType.MouseDown:
+                    if (currentEvent.button == 0)
+                    {
+                        selectedIdxProp.intValue = mouseOverIdx;
+
+                        DragAndDrop.PrepareStartDrag();
+                        CustomDragData dragData = new CustomDragData
+                        {
+                            originalIndex = mouseOverIdx,
+                            animationIdx = animIdx
+                        };
+                        DragAndDrop.SetGenericData(DRAG_DATA_KEY, dragData);
+
                         serializedObject.ApplyModifiedProperties();
                         currentEvent.Use();
-                        break;
-                    case EventType.DragPerform:
-                        if (isDragginKeyframe)
+                        Repaint();
+                    }
+                    break;
+
+                case EventType.DragUpdated:
+                    if (isDraggingKeyframe)
+                    {
+                        CustomDragData dragData = DragAndDrop.GetGenericData(DRAG_DATA_KEY) as CustomDragData;
+                        if (dragData != null && dragData.animationIdx == animIdx && dragData.originalIndex != mouseOverIdx)
                         {
-                            DragAndDrop.AcceptDrag();
-                            CustomDragData receivedDragData = DragAndDrop.GetGenericData("dragKeyframe") as CustomDragData;
-                            if (receivedDragData != null && receivedDragData.animationIdx == animationIdx)
-                            {
-                                // changes data between keyframes
-                                SpriteAnimationFrameData tmp = new SpriteAnimationFrameData();
-                                SerializedProperty kfFrom = spframeDatas.GetArrayElementAtIndex(receivedDragData.originalIndex);
-                                tmp.eventEnabled = kfFrom.FindPropertyRelative("eventEnabled").boolValue;
-                                tmp.eventName = kfFrom.FindPropertyRelative("eventName").stringValue;
-                                tmp.sprite = kfFrom.FindPropertyRelative("sprite").objectReferenceValue as Sprite;
-                                tmp.time = kfFrom.FindPropertyRelative("time").floatValue;
-
-                                SerializedProperty kfTo = spframeDatas.GetArrayElementAtIndex(mouseOverIDx);
-                                kfFrom.FindPropertyRelative("eventEnabled").boolValue = kfTo.FindPropertyRelative("eventEnabled").boolValue;
-                                kfFrom.FindPropertyRelative("eventName").stringValue = kfTo.FindPropertyRelative("eventName").stringValue;
-                                kfFrom.FindPropertyRelative("sprite").objectReferenceValue = kfTo.FindPropertyRelative("sprite").objectReferenceValue;
-                                kfFrom.FindPropertyRelative("time").floatValue = kfTo.FindPropertyRelative("time").floatValue;
-
-                                kfTo.FindPropertyRelative("eventEnabled").boolValue = tmp.eventEnabled;
-                                kfTo.FindPropertyRelative("eventName").stringValue = tmp.eventName;
-                                kfTo.FindPropertyRelative("sprite").objectReferenceValue = tmp.sprite;
-                                kfTo.FindPropertyRelative("time").floatValue = tmp.time;
-
-                                serializedObject.ApplyModifiedProperties();
-                            }
-                            isDragginKeyframe = false;
+                            DragAndDrop.visualMode = DragAndDropVisualMode.Link;
                             currentEvent.Use();
-                            DragAndDrop.PrepareStartDrag();// reset data
                         }
-                        break;
-                    case EventType.DragUpdated:
-                        if (isDragginKeyframe)
+                    }
+                    break;
+
+                case EventType.DragPerform:
+                    if (isDraggingKeyframe)
+                    {
+                        DragAndDrop.AcceptDrag();
+                        CustomDragData dragData = DragAndDrop.GetGenericData(DRAG_DATA_KEY) as CustomDragData;
+
+                        if (dragData != null && dragData.animationIdx == animIdx)
                         {
-                            CustomDragData receivedDragData = DragAndDrop.GetGenericData("dragKeyframe") as CustomDragData;
-                            if (receivedDragData != null)
-                            {
-                                if (receivedDragData.animationIdx == animationIdx && receivedDragData.originalIndex != mouseOverIDx)
-                                {
-                                    DragAndDrop.visualMode = DragAndDropVisualMode.Link;
-                                    currentEvent.Use();
-                                }
-                            }
+                            SwapFrames(framesProp, dragData.originalIndex, mouseOverIdx);
                         }
-                        break;
-                }
-            }
-            else
-            {
-                if (currentEvent.type == EventType.DragUpdated && isDragginKeyframe)
-                {
-                    DragAndDrop.visualMode = DragAndDropVisualMode.Rejected;
-                }
-            }
 
-            //                if ( playMode && spframeDatas.arraySize > 0 && spSelectedIdx.intValue > -1)
-            //                {
-            //                    float elapsed = EditorPrefs.GetFloat ( string.Format ( "Animx_ElapsedFrameTime_{0}_{1}", animationIdx , spName.stringValue ) , 0f );
-            //
-            //                    if ( EditorApplication.timeSinceStartup > elapsed )
-            //                    {
-            //                        Repaint();
-            //
-            //                        spSelectedIdx.intValue = spSelectedIdx.intValue >= spframeDatas.arraySize ? 0 : spSelectedIdx.intValue++;
-            //
-            //                        var newItem = spframeDatas.GetArrayElementAtIndex (spSelectedIdx.intValue);
-            //                        var time = newItem.FindPropertyRelative ( "time" ).floatValue;
-            //                        var speed = spSpeedRatio.floatValue;
-            //                        EditorPrefs.SetFloat ( string.Format ( "Animx_ElapsedFrameTime_{0}_{1}", animationIdx , spName.stringValue ) , (float)(EditorApplication.timeSinceStartup + (time * speed)) );
-            //
-            //                        serializedObject.ApplyModifiedProperties();
-            //                        currentEvent.Use();
-            //                    }
-            //                }
-
-            nextPos = newPos.yMax + 15f;
-            newPos.xMin = position.xMin;
-            newPos.xMax = position.xMax;
-            newPos.yMin = nextPos;
-            newPos.height = 16;
-
-            SerializedProperty selectedItem = spframeDatas.GetArrayElementAtIndex(spSelectedIdx.intValue);
-
-            newPos.width = 100;
-            EditorGUI.LabelField(newPos, new GUIContent("Sprite:"));
-            newPos.xMin = newPos.xMax + 20;
-            newPos.width = 200;
-            EditorGUI.PropertyField(newPos, selectedItem.FindPropertyRelative("sprite"), new GUIContent(string.Empty));
-            newPos.xMin = position.xMin;
-            newPos.yMin += 22f;
-            newPos.height = 20;
-            newPos.width = 100;
-            EditorGUI.LabelField(newPos, new GUIContent("Time:"));
-            newPos.xMin = newPos.xMax + 20;
-            newPos.width = 200;
-            EditorGUI.PropertyField(newPos, selectedItem.FindPropertyRelative("time"), new GUIContent(string.Empty));
-            newPos.xMin = position.xMin;
-            newPos.yMin += 22f;
-            newPos.height = 20;
-            newPos.width = 100;
-            SerializedProperty spEventEnabled = selectedItem.FindPropertyRelative("eventEnabled");
-            spEventEnabled.boolValue = EditorGUI.Toggle(newPos, spEventEnabled.boolValue, GUI.skin.button);
-            EditorGUI.LabelField(newPos, new GUIContent("Event: "));
-
-            SerializedProperty spriteProperty = selectedItem.FindPropertyRelative("sprite");
-            newPos.xMin = newPos.xMax + 20;
-            newPos.width = 200;
-            EditorGUI.PropertyField(newPos, selectedItem.FindPropertyRelative("eventName"), new GUIContent(string.Empty));
-
-            if (Event.current.type == EventType.Repaint)
-            {
-                if (spriteProperty.objectReferenceValue != null)
-                {
-                    newPos = new Rect(position.xMin, newPos.yMax + 15, position.width, 80);
-
-                    Sprite spritePreview = spriteProperty.objectReferenceValue as Sprite;
-
-                    Texture t = spritePreview.texture;
-                    Rect tr = spritePreview.rect;
-                    Rect r = new Rect(tr.x / t.width, tr.y / t.height, tr.width / t.width, tr.height / t.height);
-                    float spriteW = newPos.height / (tr.height / tr.width);
-                    newPos.xMin = (newPos.width / 2) - (spriteW / 2);
-                    newPos.width = spriteW;
-
-                    GUI.DrawTextureWithTexCoords(newPos, t, r);
-                }
+                        isDraggingKeyframe = false;
+                        currentEvent.Use();
+                        DragAndDrop.PrepareStartDrag();
+                        Repaint();
+                    }
+                    break;
             }
         }
-    }
 
-    protected void DrawBox(int idx, SerializedProperty property, SerializedProperty item, Rect pos, bool selected)
-    {
-        SerializedProperty spriteProperty = item.FindPropertyRelative("sprite");
-        Color old = GUI.backgroundColor;
-        Color selectedColor = (spriteProperty.objectReferenceValue != null) ? Color.cyan : Color.red;
-        Color unselectedColor = (spriteProperty.objectReferenceValue != null) ? Color.white : Color.red;
-        GUI.backgroundColor = selected ? selectedColor : unselectedColor;
-        GUI.Box(pos, string.Empty);
-        GUI.backgroundColor = old;
-        GUI.Label(pos, new GUIContent(idx.ToString()));
+        void SwapFrames(SerializedProperty framesProp, int fromIdx, int toIdx)
+        {
+            SerializedProperty fromFrame = framesProp.GetArrayElementAtIndex(fromIdx);
+            SerializedProperty toFrame = framesProp.GetArrayElementAtIndex(toIdx);
+
+            Object fromSprite = fromFrame.FindPropertyRelative("sprite").objectReferenceValue;
+            float fromTime = fromFrame.FindPropertyRelative("time").floatValue;
+
+            fromFrame.FindPropertyRelative("sprite").objectReferenceValue = toFrame.FindPropertyRelative("sprite").objectReferenceValue;
+            fromFrame.FindPropertyRelative("time").floatValue = toFrame.FindPropertyRelative("time").floatValue;
+
+            toFrame.FindPropertyRelative("sprite").objectReferenceValue = fromSprite;
+            toFrame.FindPropertyRelative("time").floatValue = fromTime;
+
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        void HandleDragAndDrop()
+        {
+            switch (currentEvent.type)
+            {
+                case EventType.MouseDrag:
+                    CustomDragData dragData = DragAndDrop.GetGenericData(DRAG_DATA_KEY) as CustomDragData;
+                    if (dragData != null)
+                    {
+                        DragAndDrop.visualMode = DragAndDropVisualMode.Link;
+                        isDraggingKeyframe = true;
+                        DragAndDrop.StartDrag("Dragging Frame");
+                        currentEvent.Use();
+                    }
+                    break;
+
+                case EventType.MouseUp:
+                    if (isDraggingKeyframe)
+                    {
+                        DragAndDrop.PrepareStartDrag();
+                        isDraggingKeyframe = false;
+                    }
+                    break;
+
+                case EventType.DragExited:
+                    if (isDraggingKeyframe)
+                    {
+                        DragAndDrop.PrepareStartDrag();
+                        isDraggingKeyframe = false;
+                        currentEvent.Use();
+                    }
+                    break;
+            }
+        }
     }
 }

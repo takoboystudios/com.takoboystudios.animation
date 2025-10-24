@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using Sirenix.OdinInspector;
 
 namespace TakoBoyStudios.Animation
 {
@@ -34,26 +35,38 @@ namespace TakoBoyStudios.Animation
     /// Animations are stored in SpriteAnimationAsset ScriptableObjects and can be played by name.
     /// </remarks>
     [DisallowMultipleComponent]
-    public class SpriteAnimation : MonoBehaviour
+    [ExecuteInEditMode]
+    public partial class SpriteAnimation : MonoBehaviour
     {
         #region Serialized Fields
 
+        [BoxGroup("Animation Asset")]
         [Tooltip("Current animation asset containing all animations")]
+        [OnValueChanged("OnAnimationAssetChanged")]
         public SpriteAnimationAsset animationAsset;
 
+        [BoxGroup("Playback Settings")]
         [Tooltip("Time mode for animation playback")]
         public SpriteAnimationTimeMode mode;
 
+        [BoxGroup("Playback Settings")]
         [Tooltip("Speed multiplier for animation playback (1.0 = normal speed)")]
+        [Range(0.1f, 3f)]
         public float speedRatio = 1f;
 
+        [BoxGroup("Playback Settings")]
         [Tooltip("Frame index to start playing from when enabled")]
+        [Min(0)]
         public int playFrom;
 
+        [BoxGroup("Playback Settings")]
         [Tooltip("Override Unity's Time.timeScale with custom value")]
         public bool overrideTimeScale;
 
+        [BoxGroup("Playback Settings")]
+        [ShowIf("overrideTimeScale")]
         [Tooltip("Custom time scale value when overrideTimeScale is true")]
+        [Range(0f, 3f)]
         public float timeScaleOverride = 1f;
 
         [SerializeField]
@@ -199,12 +212,18 @@ namespace TakoBoyStudios.Animation
 
         #region Unity Lifecycle
 
-        private void OnEnable()
+        private void Awake()
         {
             if (NeedsToInitialize)
             {
                 UpdateAnimations();
             }
+        }
+
+        private void Start()
+        {
+            if (!Application.isPlaying)
+                return;
 
             if (playing || animIdx < 0 || list == null || list.Count <= 0)
                 return;
@@ -217,13 +236,11 @@ namespace TakoBoyStudios.Animation
             Play(list[animIdx].animationName, playFrom);
         }
 
-        private void OnDisable()
-        {
-            playing = false;
-        }
-
         private void Update()
         {
+            if (!Application.isPlaying)
+                return;
+
             OnUpdate(GetSpeedDelta());
         }
 
@@ -254,183 +271,146 @@ namespace TakoBoyStudios.Animation
         }
 
         /// <summary>
-        /// Plays an animation by name with a frame update callback.
+        /// Plays an animation by name starting from a specific frame.
         /// </summary>
         /// <param name="animName">Name of the animation to play</param>
-        /// <param name="callback">Callback invoked on each frame change (passes frame index)</param>
-        public void Play(string animName, Action<int> callback)
+        /// <param name="startFrame">Frame index to start from</param>
+        public bool Play(string animName, int startFrame = 0)
         {
-            Play(animName);
-            m_animFrameUpdateCallback = callback;
-            AnimationFrameUpdate += m_animFrameUpdateCallback;
+            if (string.IsNullOrEmpty(animName) || !HasAnimation(animName))
+                return false;
+                
+            SetCurrentAnimation(animName, true, startFrame);
+            return true;
         }
 
         /// <summary>
-        /// Plays an animation by name.
+        /// Plays an animation by name in reverse.
         /// </summary>
         /// <param name="animName">Name of the animation to play</param>
-        /// <param name="startFrame">Frame index to start from (default: 0)</param>
-        /// <param name="showDebug">Whether to log debug warnings (default: false)</param>
-        /// <param name="setActive">Activate GameObject if inactive (default: true)</param>
-        /// <param name="reverse">Play animation in reverse (default: false)</param>
-        /// <returns>True if animation started successfully, false otherwise</returns>
-        public bool Play(string animName, int startFrame = 0, bool showDebug = false, bool setActive = true, bool reverse = false)
+        public void PlayReverse(string animName)
         {
-            if (!this)
-                return false;
-
-            if (gameObject == null)
-            {
-                if (showDebug) Debug.LogWarning("[SpriteAnimation] GameObject is null");
-                return false;
-            }
-
-            if (string.IsNullOrEmpty(animName))
-            {
-                if (showDebug) Debug.LogWarning($"[SpriteAnimation] Animation name is not valid: '{animName}'");
-                return false;
-            }
-
-            if (!gameObject.activeSelf && setActive)
-            {
-                gameObject.SetActive(true);
-            }
-
-            if (NeedsToInitialize)
-            {
-                UpdateAnimations();
-            }
-
-            RemoveCallbacks();
-            SetReverse(reverse);
-            startFrame = m_reversed ? int.MaxValue : startFrame;
-            SetCurrentAnimation(animName, false, startFrame);
-
-            if (CurrentAnimation != null && CurrentAnimation.Valid())
-            {
-                PlayCurrentAnim();
-                return true;
-            }
-
-            if (showDebug)
-            {
-                Debug.LogWarning($"[SpriteAnimation] Current animation is null or not valid: {name} - {animName}");
-            }
-
-            return false;
+            m_reversed = true;
+            SetCurrentAnimation(animName, true);
         }
 
         /// <summary>
-        /// Pauses or resumes the current animation.
+        /// Plays an animation by ID.
         /// </summary>
-        /// <param name="pause">True to pause, false to resume</param>
-        public void Pause(bool pause)
+        /// <param name="id">Animation ID</param>
+        public void PlayById(int id)
         {
-            paused = pause;
+            var anim = GetAnimationData(id);
+            if (anim != null)
+            {
+                Play(anim.name);
+            }
         }
 
         /// <summary>
-        /// Stops the current animation and removes callbacks.
+        /// Stops the current animation.
         /// </summary>
         public void Stop()
         {
             playing = false;
+            paused = false;
             RemoveCallbacks();
         }
 
         /// <summary>
-        /// Sets whether the animation plays in reverse.
+        /// Pauses or resumes the animation.
         /// </summary>
-        /// <param name="reverse">True for reverse playback</param>
-        public void SetReverse(bool reverse)
+        /// <param name="isPaused">True to pause, false to resume</param>
+        public void Pause(bool isPaused)
         {
-            m_reversed = reverse;
+            paused = isPaused;
         }
 
         /// <summary>
-        /// Returns true if the animation is playing in reverse.
+        /// Sets a single frame without playing animation.
         /// </summary>
-        public bool IsReversed()
+        /// <param name="animName">Animation name</param>
+        /// <param name="frameIdx">Frame index to display</param>
+        public void SetFrame(string animName, int frameIdx)
         {
-            return m_reversed;
+            m_singleFrame = true;
+            SetCurrentAnimation(animName, false, frameIdx);
         }
 
         /// <summary>
-        /// Checks if a specific animation ID is currently playing.
+        /// Sets the current animation without auto-playing.
         /// </summary>
-        /// <param name="animId">Animation ID to check</param>
-        /// <returns>True if the specified animation is playing</returns>
-        public bool IsPlaying(int animId)
+        /// <param name="animName">Name of the animation</param>
+        /// <param name="play">Whether to start playing immediately</param>
+        /// <param name="startFrame">Frame index to start from</param>
+        public void SetCurrentAnimation(string animName, bool play = false, int startFrame = 0)
         {
-            return animIdx == animId;
+            if (NeedsToInitialize)
+                UpdateAnimations();
+
+            if (string.IsNullOrEmpty(animName))
+            {
+                animIdx = -1;
+                m_currentAnimation = null;
+                m_currentAnimId = -1;
+                return;
+            }
+
+            SpriteAnimationData newData = GetAnimationData(animName);
+
+            if (newData == null)
+            {
+                Debug.LogWarning($"[SpriteAnimation] Animation '{animName}' not found on {name}");
+                return;
+            }
+
+            m_currentAnimation = newData;
+            m_currentAnimId = GetAnimationId(animName);
+            animIdx = m_currentAnimId;
+            CurrentFrame = Mathf.Clamp(startFrame, 0, CurrentFrameCount - 1);
+            timer = 0;
+
+            if (play)
+            {
+                PlayCurrentAnim();
+            }
+            else
+            {
+                SetCurrentFrame();
+            }
         }
 
         #endregion
 
-        #region Animation Data Management
+        #region Animation Management
 
         /// <summary>
-        /// Updates the internal animation dictionaries from the animation asset.
-        /// Call this after changing the animation asset or its contents.
+        /// Updates the internal animation dictionaries from the asset.
+        /// Call this when animation assets change.
         /// </summary>
         public void UpdateAnimations()
         {
-            m_animationsByName ??= new Dictionary<string, SpriteAnimationData>();
-            m_animationsById ??= new Dictionary<string, int>();
-            list ??= new List<AnimationListItem>();
+            m_animationsByName = new Dictionary<string, SpriteAnimationData>();
+            m_animationsById = new Dictionary<string, int>();
+            list = new List<AnimationListItem>();
 
-            m_animationsByName.Clear();
-            m_animationsById.Clear();
-            list.Clear();
-
-            if (animationAsset == null || animationAsset.animations == null || animationAsset.animations.Count <= 0)
+            if (animationAsset == null || animationAsset.animations == null)
                 return;
 
-            for (int i = 0; i < animationAsset.animations.Count; i++)
+            int id = 0;
+            foreach (var data in animationAsset.animations.Where(a => a.Valid()))
             {
-                SpriteAnimationData data = animationAsset.animations[i];
-                m_animationsByName[data.name] = data;
-                m_animationsById.TryAdd(data.name, i);
-
-                AnimationListItem item = new AnimationListItem
+                var item = new AnimationListItem
                 {
-                    animation = data,
                     animationName = data.name,
+                    animation = data,
                     file = animationAsset
                 };
+
                 list.Add(item);
+                m_animationsByName[data.name] = data;
+                m_animationsById[data.name] = id++;
             }
-        }
-
-        /// <summary>
-        /// Sets the current animation by index.
-        /// </summary>
-        /// <param name="idx">Index of the animation in the list</param>
-        public void SetCurrentAnimation(int idx)
-        {
-            animIdx = idx;
-            currentIdx = 0;
-        }
-
-        /// <summary>
-        /// Sets the current animation by name.
-        /// </summary>
-        /// <param name="animName">Name of the animation</param>
-        /// <param name="editor">Whether this is being called from the editor</param>
-        /// <param name="frame">Starting frame index</param>
-        public void SetCurrentAnimation(string animName, bool editor, int frame = 0)
-        {
-            if (editor)
-                UpdateAnimations();
-
-            m_currentAnimation = GetAnimationData(animName);
-
-            if (m_currentAnimation == null)
-                return;
-
-            animIdx = m_animationsById[animName];
-            currentIdx = Mathf.Clamp(frame, 0, m_currentAnimation.frameDatas.Count - 1);
-            m_singleFrame = m_currentAnimation.frameDatas.Count <= 1;
         }
 
         /// <summary>
@@ -678,15 +658,18 @@ namespace TakoBoyStudios.Animation
 
         #endregion
 
-        #region Editor Support
+        #region Odin Callbacks
 
-        /// <summary>
-        /// Editor-only update method for animation preview in edit mode.
-        /// </summary>
-        /// <param name="deltaTime">Time since last editor update</param>
-        public void EditorUpdate(float deltaTime)
+        private void OnAnimationAssetChanged()
         {
-            OnUpdate(deltaTime);
+            UpdateAnimations();
+#if UNITY_EDITOR
+            // Reset selected animation if it doesn't exist in new asset
+            if (!string.IsNullOrEmpty(m_selectedAnimation) && !HasAnimation(m_selectedAnimation))
+            {
+                m_selectedAnimation = string.Empty;
+            }
+#endif
         }
 
         #endregion

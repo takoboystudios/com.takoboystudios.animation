@@ -44,7 +44,7 @@ namespace TakoBoyStudios.Animation.Editor
         /// <summary>
         /// Creates a new empty SpriteAnimationAsset.
         /// </summary>
-        [MenuItem("Assets/Create/TakoBoy Studios/Animation/Sprite Animation Asset", priority = 80)]
+        [MenuItem("Assets/Create/TakoBoy Studios/Animation/Sprite Animation Asset", priority = 8)]
         public static void CreateAnimationAsset()
         {
             var asset = ScriptableObject.CreateInstance<SpriteAnimationAsset>();
@@ -67,7 +67,7 @@ namespace TakoBoyStudios.Animation.Editor
         /// If a JSON file with matching name exists (AssetName@AnimationName.json), it will be used for frame timing.
         /// JSON format: {"frames": [100, 100, 150, 100]} where values are milliseconds per frame.
         /// </remarks>
-        [MenuItem("Assets/TakoBoy Studios/Animation/Create Animation from Selected", priority = 100)]
+        [MenuItem("Assets/TakoBoy Studios/Animation/Create Animation from Selected", priority = 10)]
         public static void CreateSpriteAnimationFromSelected()
         {
             string[] guids = Selection.assetGUIDs;
