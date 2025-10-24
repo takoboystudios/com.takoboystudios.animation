@@ -37,18 +37,6 @@ namespace TakoBoyStudios.Animation.Editor
             SliceSprites(Selection.assetGUIDs);
         }
 
-        [MenuItem("Assets/TakoBoy Studios/Sprites/Configure PPU", false, 3)]
-        public static void ConfigurePPU()
-        {
-            int currentPPU = PixelsPerUnit;
-            string input = EditorInputDialog.Show("Configure Pixels Per Unit", $"Current: {currentPPU}", currentPPU.ToString());
-            if (!string.IsNullOrEmpty(input) && int.TryParse(input, out int newPPU) && newPPU > 0)
-            {
-                EditorPrefs.SetInt(PPU_PREF_KEY, newPPU);
-                Debug.Log($"[SpriteProcessor] PPU set to: {newPPU}");
-            }
-        }
-
         private static void ProcessSprites(string[] guids, bool skipIfAlreadyProcessed)
         {
             if (guids == null || guids.Length == 0) return;

@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using TakoBoyStudios.Core;
 
 namespace TakoBoyStudios.Animation
 {

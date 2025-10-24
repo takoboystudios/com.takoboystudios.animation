@@ -1,5 +1,5 @@
 {
-    "name": "TakoBoyStudios.Animation.Runtime",
+    "name": "TakoBoyStudios.Animation",
     "rootNamespace": "TakoBoyStudios.Animation",
     "references": [
         "TakoBoyStudios.Core"

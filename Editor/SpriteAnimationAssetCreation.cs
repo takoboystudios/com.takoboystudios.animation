@@ -44,8 +44,8 @@ namespace TakoBoyStudios.Animation.Editor
         /// <summary>
         /// Creates a new empty SpriteAnimationAsset.
         /// </summary>
-        [MenuItem("Assets/Create/TakoBoy Studios/Animation/Sprite Animation Asset", priority = 8)]
-        public static void CreateAnimationAsset()
+        [MenuItem("Assets/Create/TakoBoy Studios/Animation/Create Animation Asset", priority = 8)]
+        public static void CreateSpriteAnimationAsset()
         {
             var asset = ScriptableObject.CreateInstance<SpriteAnimationAsset>();
             ProjectWindowUtil.StartNameEditingIfProjectWindowExists(
