@@ -2,7 +2,7 @@
     "name": "TakoBoyStudios.Animation.Editor",
     "rootNamespace": "TakoBoyStudios.Animation.Editor",
     "references": [
-        "TakoBoyStudios.Animation.Runtime",
+        "TakoBoyStudios.Animation",
         "TakoBoyStudios.Core",
         "Unity.2D.Sprite.Editor"
     ],
