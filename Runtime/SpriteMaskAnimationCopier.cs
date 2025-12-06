@@ -30,13 +30,13 @@ namespace TakoBoyStudios.Animation
 
         #region Private Fields
 
-        private SpriteMask m_spriteMask;
+        SpriteMask m_spriteMask;
 
         #endregion
 
         #region Unity Lifecycle
 
-        private void Awake()
+        void Awake()
         {
             m_spriteMask = GetComponent<SpriteMask>();
 
@@ -51,7 +51,7 @@ namespace TakoBoyStudios.Animation
             }
         }
 
-        private void Update()
+        void Update()
         {
             if (m_renderer != null && m_spriteMask != null)
             {

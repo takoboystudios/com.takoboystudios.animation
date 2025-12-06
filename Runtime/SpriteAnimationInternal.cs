@@ -16,24 +16,24 @@ namespace TakoBoyStudios.Animation
         [HorizontalGroup("Animation Preview/h1"), HideLabel]
         [ValueDropdown("GetAnimationDropdown")]
         [OnValueChanged("OnSelectedAnimationChanged")]
-        private string m_selectedAnimation;
+        string m_selectedAnimation;
 
-        private bool m_playingEditorAnimation;
-        private DateTime m_lastUpdateTime;
-        private float m_simulatedDeltaTime;
+        bool m_playingEditorAnimation;
+        DateTime m_lastUpdateTime;
+        float m_simulatedDeltaTime;
 
         // =================================================================================================================
         // UPDATES FOR THE EDITOR
         // =================================================================================================================
 
-        private void EditorUpdate()
+        void EditorUpdate()
         {
             m_simulatedDeltaTime = (float)(DateTime.Now - m_lastUpdateTime).TotalSeconds;
             m_lastUpdateTime = DateTime.Now;
             EditorUpdateAnimation(m_simulatedDeltaTime);
         }
 
-        private void EditorUpdateAnimation(float deltaTime)
+        void EditorUpdateAnimation(float deltaTime)
         {
             if (m_playingEditorAnimation && !string.IsNullOrEmpty(m_selectedAnimation))
             {
@@ -59,7 +59,7 @@ namespace TakoBoyStudios.Animation
         [BoxGroup("Animation Preview")]
         [Button("", Icon = SdfIconType.CaretRightFill)]
         [HorizontalGroup("Animation Preview/h1", Width = 20)]
-        private void PlayButton()
+        void PlayButton()
         {
             m_playingEditorAnimation = !m_playingEditorAnimation;
         }
@@ -68,7 +68,7 @@ namespace TakoBoyStudios.Animation
         // ON PROPERTY CHANGED CALLBACKS
         // =================================================================================================================
 
-        private void OnSelectedAnimationChanged()
+        void OnSelectedAnimationChanged()
         {
             if (NeedsToInitialize)
                 UpdateAnimations();
@@ -84,12 +84,12 @@ namespace TakoBoyStudios.Animation
         // VALUE GETTERS
         // =================================================================================================================
 
-        private Color GetButtonColor()
+        Color GetButtonColor()
         {
             return m_playingEditorAnimation ? Color.green : Color.white;
         }
 
-        private IEnumerable<ValueDropdownItem<string>> GetAnimationDropdown()
+        IEnumerable<ValueDropdownItem<string>> GetAnimationDropdown()
         {
             if (animationAsset == null || animationAsset.animations == null)
             {
@@ -112,12 +112,12 @@ namespace TakoBoyStudios.Animation
         // UNITY CALLBACKS
         // =================================================================================================================
 
-        private void OnEnable()
+        void OnEnable()
         {
             UnityEditor.EditorApplication.update += EditorUpdate;
         }
 
-        private void OnDisable()
+        void OnDisable()
         {
             m_playingEditorAnimation = false;
             UnityEditor.EditorApplication.update -= EditorUpdate;

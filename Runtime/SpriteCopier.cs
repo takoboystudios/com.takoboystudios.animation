@@ -47,8 +47,8 @@ namespace TakoBoyStudios.Animation
 
         #region Private Fields
 
-        private SpriteRenderer m_renderer;
-        private Image m_image;
+        SpriteRenderer m_renderer;
+        Image m_image;
 
         #endregion
 
@@ -133,7 +133,7 @@ namespace TakoBoyStudios.Animation
 
         #region Unity Lifecycle
 
-        private void Awake()
+        void Awake()
         {
             m_renderer = GetComponent<SpriteRenderer>();
             m_image = GetComponent<Image>();

@@ -87,18 +87,14 @@ namespace TakoBoyStudios.Animation
 
         #region Private Fields
 
-        private bool m_reversed;
-        private bool m_singleFrame;
-        private int m_currentAnimId;
-        private SpriteRenderer m_renderer;
-        private Image m_image;
-        private SpriteAnimationData m_currentAnimation;
-
-        private Action m_animCompleteCallback;
-        private Action<int> m_animFrameUpdateCallback;
-
-        private Dictionary<string, SpriteAnimationData> m_animationsByName;
-        private Dictionary<string, int> m_animationsById;
+        bool m_reversed;
+        bool m_singleFrame;
+        int m_currentAnimId;
+        SpriteRenderer m_renderer;
+        Image m_image;
+        SpriteAnimationData m_currentAnimation;
+        Dictionary<string, SpriteAnimationData> m_animationsByName;
+        Dictionary<string, int> m_animationsById;
 
         #endregion
 
@@ -107,12 +103,12 @@ namespace TakoBoyStudios.Animation
         /// <summary>
         /// Invoked when an animation completes (reaches end for non-looping, or loops for looping animations).
         /// </summary>
-        public event Action AnimationComplete;
+        public event Action OnAnimationComplete;
 
         /// <summary>
         /// Invoked every time the current frame changes. Passes the new frame index.
         /// </summary>
-        public event Action<int> AnimationFrameUpdate;
+        public event Action<int> OnFrameChanged;
 
         #endregion
 
@@ -150,11 +146,6 @@ namespace TakoBoyStudios.Animation
         public bool IsDone => !playing || m_singleFrame || (CurrentFrame >= CurrentFrameCount - 1 && timer > 0);
 
         /// <summary>
-        /// Returns true if the animation will be done on the next frame.
-        /// </summary>
-        public bool IsDoneNextFrame => !playing || m_singleFrame || CurrentFrame >= CurrentFrameCount - 1;
-
-        /// <summary>
         /// Returns true if the animation system needs to be initialized.
         /// </summary>
         public bool NeedsToInitialize => m_animationsByName == null || m_animationsById == null || list == null;
@@ -170,19 +161,9 @@ namespace TakoBoyStudios.Animation
         protected SpriteAnimationData CurrentAnimation => m_currentAnimation;
 
         /// <summary>
-        /// Gets the current animation ID.
-        /// </summary>
-        public int CurrentAnimationId => m_currentAnimId;
-
-        /// <summary>
         /// Gets the name of the currently playing animation.
         /// </summary>
         public string CurrentAnimationName => CurrentAnimation != null ? CurrentAnimation.name : string.Empty;
-
-        /// <summary>
-        /// Gets the index of the current animation in the animation list.
-        /// </summary>
-        public int CurrentAnimationIdx => animIdx;
 
         /// <summary>
         /// Gets or sets the current frame index.
@@ -212,7 +193,7 @@ namespace TakoBoyStudios.Animation
 
         #region Unity Lifecycle
 
-        private void Awake()
+        void Awake()
         {
             if (NeedsToInitialize)
             {
@@ -220,7 +201,7 @@ namespace TakoBoyStudios.Animation
             }
         }
 
-        private void Start()
+        void Start()
         {
             if (!Application.isPlaying)
                 return;
@@ -236,7 +217,7 @@ namespace TakoBoyStudios.Animation
             Play(list[animIdx].animationName, playFrom);
         }
 
-        private void Update()
+        void Update()
         {
             if (!Application.isPlaying)
                 return;
@@ -244,67 +225,27 @@ namespace TakoBoyStudios.Animation
             OnUpdate(GetSpeedDelta());
         }
 
-        private void OnDestroy()
-        {
-            RemoveCallbacks();
-        }
+        void Reset() => UpdateAnimations();
 
-        private void Reset()
-        {
-            UpdateAnimations();
-        }
+        void OnValidate() => UpdateAnimations();
 
         #endregion
 
         #region Animation Playback
-
-        /// <summary>
-        /// Plays an animation by name with a completion callback.
-        /// </summary>
-        /// <param name="animName">Name of the animation to play</param>
-        /// <param name="callback">Callback invoked when animation completes</param>
-        public void Play(string animName, Action callback)
-        {
-            Play(animName);
-            m_animCompleteCallback = callback;
-            AnimationComplete += m_animCompleteCallback;
-        }
-
         /// <summary>
         /// Plays an animation by name starting from a specific frame.
         /// </summary>
         /// <param name="animName">Name of the animation to play</param>
         /// <param name="startFrame">Frame index to start from</param>
-        public bool Play(string animName, int startFrame = 0)
+        /// <param name="reversed">Plays backwards</param>
+        public bool Play(string animName, int startFrame = 0, bool reversed = false)
         {
             if (string.IsNullOrEmpty(animName) || !HasAnimation(animName))
                 return false;
-                
+            
+            m_reversed = reversed;
             SetCurrentAnimation(animName, true, startFrame);
             return true;
-        }
-
-        /// <summary>
-        /// Plays an animation by name in reverse.
-        /// </summary>
-        /// <param name="animName">Name of the animation to play</param>
-        public void PlayReverse(string animName)
-        {
-            m_reversed = true;
-            SetCurrentAnimation(animName, true);
-        }
-
-        /// <summary>
-        /// Plays an animation by ID.
-        /// </summary>
-        /// <param name="id">Animation ID</param>
-        public void PlayById(int id)
-        {
-            var anim = GetAnimationData(id);
-            if (anim != null)
-            {
-                Play(anim.name);
-            }
         }
 
         /// <summary>
@@ -314,7 +255,6 @@ namespace TakoBoyStudios.Animation
         {
             playing = false;
             paused = false;
-            RemoveCallbacks();
         }
 
         /// <summary>
@@ -343,7 +283,7 @@ namespace TakoBoyStudios.Animation
         /// <param name="animName">Name of the animation</param>
         /// <param name="play">Whether to start playing immediately</param>
         /// <param name="startFrame">Frame index to start from</param>
-        public void SetCurrentAnimation(string animName, bool play = false, int startFrame = 0)
+        void SetCurrentAnimation(string animName, bool play = false, int startFrame = 0)
         {
             if (NeedsToInitialize)
                 UpdateAnimations();
@@ -553,7 +493,7 @@ namespace TakoBoyStudios.Animation
         /// Called from Update() or EditorUpdate().
         /// </summary>
         /// <param name="deltaTime">Time since last update</param>
-        private void OnUpdate(float deltaTime)
+        void OnUpdate(float deltaTime)
         {
             if (!playing || paused || m_singleFrame || CurrentAnimation == null)
                 return;
@@ -570,11 +510,7 @@ namespace TakoBoyStudios.Animation
             // Check if animation completed
             if (CurrentFrame >= CurrentAnimation.frameDatas.Count || CurrentFrame < 0)
             {
-                // Invoke completion callback
-                if (m_animCompleteCallback != null)
-                {
-                    AnimationComplete?.Invoke();
-                }
+                OnAnimationComplete?.Invoke();
 
                 // Handle looping
                 switch (CurrentAnimation.loop)
@@ -592,12 +528,7 @@ namespace TakoBoyStudios.Animation
             }
 
             SetCurrentFrame();
-
-            // Invoke frame update callback
-            if (m_animFrameUpdateCallback != null)
-            {
-                AnimationFrameUpdate?.Invoke(CurrentFrame);
-            }
+            OnFrameChanged?.Invoke(CurrentFrame);
         }
 
         /// <summary>
@@ -638,29 +569,11 @@ namespace TakoBoyStudios.Animation
             }
         }
 
-        /// <summary>
-        /// Removes all callbacks to prevent memory leaks.
-        /// </summary>
-        private void RemoveCallbacks()
-        {
-            if (m_animCompleteCallback != null)
-            {
-                AnimationComplete -= m_animCompleteCallback;
-                m_animCompleteCallback = null;
-            }
-
-            if (m_animFrameUpdateCallback != null)
-            {
-                AnimationFrameUpdate -= m_animFrameUpdateCallback;
-                m_animFrameUpdateCallback = null;
-            }
-        }
-
         #endregion
 
         #region Odin Callbacks
 
-        private void OnAnimationAssetChanged()
+        void OnAnimationAssetChanged()
         {
             UpdateAnimations();
 #if UNITY_EDITOR

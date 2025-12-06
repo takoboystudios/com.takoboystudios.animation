@@ -3,42 +3,27 @@ using UnityEngine;
 
 namespace TakoBoyStudios.Animation
 {
-    /// <summary>
-    /// Component that automatically destroys or returns a GameObject to a pool after its animation completes.
-    /// Automatically detects if the object came from a pool and handles cleanup appropriately.
-    /// </summary>
-    /// <remarks>
-    /// This component requires a SpriteAnimation component on the same GameObject.
-    /// 
-    /// Usage:
-    /// 1. Attach to a GameObject with SpriteAnimation
-    /// 2. Set the animation name to play
-    /// 3. Call Play() to start the animation
-    /// 4. Object will be automatically destroyed/pooled when animation completes
-    /// 
-    /// The component automatically detects if the GameObject came from PoolManager and will
-    /// return it to the pool instead of destroying it. No manual configuration needed!
-    /// </remarks>
     [RequireComponent(typeof(SpriteAnimation))]
     public class DestroyAfterAnimation : MonoBehaviour
     {
-        #region Serialized Fields
-
-        /// <summary>
-        /// Name of the animation to play when Play() is called.
-        /// </summary>
-        [Tooltip("Name of the animation to play")]
-        public string m_animation;
-
         public enum DestroyBehaviour { Destroy, Disable }
+        
+        #region Serialized Fields
+        
+        [Tooltip("Name of the animation to play")]
+        [SerializeField]
+        [InspectorName("animation")]
+        string animationToPlay;
 
-        public DestroyBehaviour destroyBehaviour;
+        [Tooltip("The type of stop behaviour, either disabled or destroyed.")]
+        [SerializeField]
+        DestroyBehaviour destroyBehaviour;
 
         #endregion
 
         #region Private Fields
 
-        private SpriteAnimation m_animator;
+        SpriteAnimation _animator;
 
         #endregion
 
@@ -48,7 +33,7 @@ namespace TakoBoyStudios.Animation
         /// Event invoked when the animation completes, before the GameObject is destroyed/pooled.
         /// Passes the GameObject that is about to be cleaned up.
         /// </summary>
-        public event Action<GameObject> OnAnimationComplete;
+        public event Action<GameObject> OnFinished;
 
         #endregion
 
@@ -57,13 +42,13 @@ namespace TakoBoyStudios.Animation
         /// <summary>
         /// Gets the SpriteAnimation component (cached).
         /// </summary>
-        public SpriteAnimation animator
+        public SpriteAnimation Animator
         {
             get
             {
-                if (m_animator == null)
-                    m_animator = GetComponent<SpriteAnimation>();
-                return m_animator;
+                if (_animator == null)
+                    _animator = GetComponent<SpriteAnimation>();
+                return _animator;
             }
         }
 
@@ -77,7 +62,8 @@ namespace TakoBoyStudios.Animation
         /// </summary>
         public void Start()
         {
-            animator.UpdateAnimations();
+            Animator.OnAnimationComplete += AnimationComplete;
+            Animator.UpdateAnimations();
         }
 
         #endregion
@@ -89,13 +75,13 @@ namespace TakoBoyStudios.Animation
         /// </summary>
         public void Play()
         {
-            if (string.IsNullOrEmpty(m_animation))
+            if (string.IsNullOrEmpty(animationToPlay))
             {
                 Debug.LogWarning("[DestroyAfterAnimation] No animation name set!", gameObject);
                 return;
             }
 
-            animator.Play(m_animation, AnimationComplete);
+            Animator.Play(animationToPlay);
         }
 
         /// <summary>
@@ -110,7 +96,7 @@ namespace TakoBoyStudios.Animation
                 return;
             }
 
-            animator.Play(animName, AnimationComplete);
+            Animator.Play(animName);
         }
 
         #endregion
@@ -120,16 +106,31 @@ namespace TakoBoyStudios.Animation
         /// <summary>
         /// Called when the animation completes. Handles cleanup by either returning to pool or destroying.
         /// </summary>
-        private void AnimationComplete()
+        void AnimationComplete()
         {
+            RemoveCallbacks();
+            
             // Invoke event before cleanup
-            OnAnimationComplete?.Invoke(gameObject);
+            OnFinished?.Invoke(gameObject);
 
             if(destroyBehaviour == DestroyBehaviour.Disable)
                 gameObject.SetActive(false);
             else if (destroyBehaviour == DestroyBehaviour.Destroy)
                 Destroy(gameObject);
         }
+
+        void RemoveCallbacks()
+        {
+            Animator.OnAnimationComplete -= AnimationComplete;
+        }
+
+        void OnValidate()
+        {
+            if (_animator == null)
+                _animator = GetComponent<SpriteAnimation>();
+        }
+
+        void OnDestroy() => RemoveCallbacks();
 
         #endregion
     }
