@@ -34,14 +34,6 @@ namespace TakoBoyStudios.Animation.Editor
         public const float DEFAULT_FRAME_TIME = 0.04f;
 
         /// <summary>
-        /// Default path where animation assets are saved.
-        /// Can be configured via EditorPrefs key "TakoBoy_AnimationSavePath".
-        /// </summary>
-        public const string DEFAULT_ANIMATION_SAVE_PATH = "Assets/Animations/";
-
-        private const string SAVE_PATH_PREF_KEY = "TakoBoy_AnimationSavePath";
-
-        /// <summary>
         /// Creates a new empty SpriteAnimationAsset.
         /// </summary>
         [MenuItem("Assets/Create/TakoBoy Studios/Animation/Create Animation Asset", priority = 8)]
@@ -67,7 +59,7 @@ namespace TakoBoyStudios.Animation.Editor
         /// If a JSON file with matching name exists (AssetName@AnimationName.json), it will be used for frame timing.
         /// JSON format: {"frames": [100, 100, 150, 100]} where values are milliseconds per frame.
         /// </remarks>
-        [MenuItem("Assets/TakoBoy Studios/Animation/Create Animation from Selected", priority = 10)]
+        [MenuItem("Assets/TakoBoy Studios/Animation/Create Animation", priority = 10)]
         public static void CreateSpriteAnimationFromSelected()
         {
             string[] guids = Selection.assetGUIDs;
@@ -113,7 +105,9 @@ namespace TakoBoyStudios.Animation.Editor
                 string animationName = nameParts[1];
 
                 // Get or create the animation asset
-                string animationAssetPath = GetAnimationAssetSavePath() + animationAssetName + ".asset";
+                string textureFolder = Path.GetDirectoryName(path);
+                textureFolder = string.IsNullOrEmpty(textureFolder) ? "Assets/" : textureFolder;
+                string animationAssetPath = Path.Combine(textureFolder, animationAssetName + ".asset").Replace("\\", "/");
                 SpriteAnimationAsset animationAsset = AssetDatabase.LoadAssetAtPath<SpriteAnimationAsset>(animationAssetPath);
 
                 if (animationAsset == null)
@@ -198,19 +192,12 @@ namespace TakoBoyStudios.Animation.Editor
             }
 
             AssetDatabase.SaveAssets();
-
-            // Show result dialog
-            string message = $"Animation Creation Complete!\n\n" +
-                           $"Successfully created: {successCount}\n" +
-                           $"Failed: {failCount}";
-
-            EditorUtility.DisplayDialog("Animation Creation", message, "OK");
         }
 
         /// <summary>
         /// Validates if the Create Animation menu item should be enabled.
         /// </summary>
-        [MenuItem("Assets/TakoBoy Studios/Animation/Create Animation from Selected", true)]
+        [MenuItem("Assets/TakoBoy Studios/Animation/Create Animation", true)]
         private static bool ValidateCreateSpriteAnimation()
         {
             // Only enable if at least one texture is selected
@@ -222,64 +209,7 @@ namespace TakoBoyStudios.Animation.Editor
             return false;
         }
 
-        /// <summary>
-        /// Opens preferences to configure the animation save path.
-        /// </summary>
-        [MenuItem("Assets/TakoBoy Studios/Animation/Configure Save Path", priority = 200)]
-        public static void ConfigureSavePath()
-        {
-            string currentPath = GetAnimationAssetSavePath();
-            string newPath = EditorUtility.OpenFolderPanel("Select Animation Asset Save Location", "Assets", "");
-
-            if (!string.IsNullOrEmpty(newPath))
-            {
-                // Convert absolute path to relative
-                if (newPath.StartsWith(Application.dataPath))
-                {
-                    newPath = "Assets" + newPath.Substring(Application.dataPath.Length);
-                }
-
-                // Ensure path ends with /
-                if (!newPath.EndsWith("/"))
-                    newPath += "/";
-
-                EditorPrefs.SetString(SAVE_PATH_PREF_KEY, newPath);
-                Debug.Log($"[SpriteAnimationCreator] Animation save path set to: {newPath}");
-            }
-        }
-
         #region Private Helper Methods
-
-        /// <summary>
-        /// Gets the configured animation asset save path from EditorPrefs.
-        /// </summary>
-        private static string GetAnimationAssetSavePath()
-        {
-            string path = EditorPrefs.GetString(SAVE_PATH_PREF_KEY, DEFAULT_ANIMATION_SAVE_PATH);
-
-            // Ensure the directory exists
-            if (!AssetDatabase.IsValidFolder(path.TrimEnd('/')))
-            {
-                // Try to create the folders
-                string[] folders = path.Split('/');
-                string currentPath = folders[0];
-
-                for (int i = 1; i < folders.Length; i++)
-                {
-                    if (string.IsNullOrEmpty(folders[i]))
-                        continue;
-
-                    string newPath = currentPath + "/" + folders[i];
-                    if (!AssetDatabase.IsValidFolder(newPath))
-                    {
-                        AssetDatabase.CreateFolder(currentPath, folders[i]);
-                    }
-                    currentPath = newPath;
-                }
-            }
-
-            return path;
-        }
 
         /// <summary>
         /// Attempts to load frame timing data from a JSON file.
