@@ -146,6 +146,14 @@ namespace TakoBoyStudios.Animation
         public bool IsDone => !playing || m_singleFrame || (CurrentFrame >= CurrentFrameCount - 1 && timer > 0);
 
         /// <summary>
+        /// True once a clip that plays once has played out, its last frame's time included. A looping
+        /// clip never finishes. IsDone, by contrast, is true from the moment the last frame shows, so
+        /// it cuts the last frame's time short and ends a one-frame clip at once: wait on this when
+        /// the clip's timing is the point (a draw held for its authored time, say).
+        /// </summary>
+        public bool HasFinished => !playing;
+
+        /// <summary>
         /// Returns true if the animation system needs to be initialized.
         /// </summary>
         public bool NeedsToInitialize => m_animationsByName == null || m_animationsById == null || list == null;
